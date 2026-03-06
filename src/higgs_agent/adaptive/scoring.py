@@ -43,6 +43,13 @@ class AdaptiveCandidateExclusion:
     model_id: str | None
     reason: str
 
+    def as_payload(self) -> dict[str, object]:
+        return {
+            "provider": self.provider,
+            "model_id": self.model_id,
+            "reason": self.reason,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class AdaptiveRouteScore:
@@ -52,8 +59,23 @@ class AdaptiveRouteScore:
     total_score: float
     factor_scores: dict[str, float]
     telemetry_gaps: tuple[str, ...]
+    used_deterministic_defaults: bool
     explanation: tuple[str, ...]
     tie_break_key: tuple[float, float, str, str]
+
+    def as_payload(self, *, selected: bool) -> dict[str, object]:
+        return {
+            "selected": selected,
+            "provider": self.route.provider,
+            "model_id": self.route.model_id,
+            "route_family": self.route.route_family,
+            "estimated_cost_usd": self.route.estimated_cost_usd,
+            "total_score": self.total_score,
+            "factor_scores": dict(self.factor_scores),
+            "telemetry_gaps": list(self.telemetry_gaps),
+            "used_deterministic_defaults": self.used_deterministic_defaults,
+            "explanation": list(self.explanation),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +88,26 @@ class AdaptiveRouteSelection:
     scoring_weights: dict[str, float]
     tie_break_policy: tuple[str, ...]
     telemetry_source: str
+
+    def as_metadata_payload(self) -> dict[str, object]:
+        return {
+            "selected_route": {
+                "provider": self.selected_route.provider,
+                "model_id": self.selected_route.model_id,
+                "route_family": self.selected_route.route_family,
+                "estimated_cost_usd": self.selected_route.estimated_cost_usd,
+            },
+            "ranked_candidates": [
+                candidate.as_payload(selected=candidate.route == self.selected_route)
+                for candidate in self.ranked_candidates
+            ],
+            "excluded_candidates": [
+                candidate.as_payload() for candidate in self.excluded_candidates
+            ],
+            "scoring_weights": dict(self.scoring_weights),
+            "tie_break_policy": list(self.tie_break_policy),
+            "telemetry_source": self.telemetry_source,
+        }
 
 
 def select_adaptive_route(
@@ -168,11 +210,19 @@ def _score_candidate(
     max_known_latency: float | None,
 ) -> AdaptiveRouteScore:
     telemetry_gaps = telemetry_entry.telemetry_gaps if telemetry_entry is not None else ("telemetry_missing",)
-    success_signal = telemetry_entry.success_rate if telemetry_entry is not None else 0.5
-    failure_signal = telemetry_entry.failure_rate if telemetry_entry is not None else 0.0
-    retry_signal = _retry_rate(telemetry_entry)
-    latency_signal = _latency_signal(telemetry_entry, max_known_latency)
-    cost_signal = _cost_signal(candidate, telemetry_entry, max_known_cost)
+    used_deterministic_defaults = _should_use_deterministic_defaults(telemetry_entry)
+    if used_deterministic_defaults:
+        success_signal = 0.5
+        failure_signal = 0.0
+        retry_signal = 0.0
+        latency_signal = 0.5
+        cost_signal = _cost_signal(candidate, None, max_known_cost)
+    else:
+        success_signal = telemetry_entry.success_rate
+        failure_signal = telemetry_entry.failure_rate
+        retry_signal = _retry_rate(telemetry_entry)
+        latency_signal = _latency_signal(telemetry_entry, max_known_latency)
+        cost_signal = _cost_signal(candidate, telemetry_entry, max_known_cost)
     capability_fit = _capability_fit(candidate, semantics)
 
     factor_scores = {
@@ -189,6 +239,8 @@ def _score_candidate(
         telemetry_entry=telemetry_entry,
         factor_scores=factor_scores,
         capability_fit=capability_fit,
+        telemetry_gaps=telemetry_gaps,
+        used_deterministic_defaults=used_deterministic_defaults,
     )
     estimated_cost = candidate.estimated_cost_usd if candidate.estimated_cost_usd is not None else 999999.0
     tie_break_key = (-total_score, estimated_cost, candidate.provider or "", candidate.model_id or "")
@@ -197,9 +249,14 @@ def _score_candidate(
         total_score=total_score,
         factor_scores=factor_scores,
         telemetry_gaps=telemetry_gaps,
+        used_deterministic_defaults=used_deterministic_defaults,
         explanation=explanation,
         tie_break_key=tie_break_key,
     )
+
+
+def _should_use_deterministic_defaults(telemetry_entry: AdaptiveTelemetryEntry | None) -> bool:
+    return telemetry_entry is None or telemetry_entry.freshness_state == "stale"
 
 
 def _retry_rate(telemetry_entry: AdaptiveTelemetryEntry | None) -> float:
@@ -261,6 +318,8 @@ def _explanation(
     telemetry_entry: AdaptiveTelemetryEntry | None,
     factor_scores: dict[str, float],
     capability_fit: float,
+    telemetry_gaps: tuple[str, ...],
+    used_deterministic_defaults: bool,
 ) -> tuple[str, ...]:
     explanation = [
         f"provider:{candidate.provider}",
@@ -275,5 +334,9 @@ def _explanation(
         explanation.append(f"success_rate:{telemetry_entry.success_rate:.2f}")
         explanation.append(f"failure_rate:{telemetry_entry.failure_rate:.2f}")
         explanation.append(f"freshness_state:{telemetry_entry.freshness_state}")
+    if telemetry_gaps:
+        explanation.append(f"telemetry_gaps:{','.join(telemetry_gaps)}")
+    if used_deterministic_defaults:
+        explanation.append("adaptive_default:deterministic")
     explanation.extend(f"{name}:{value:.4f}" for name, value in factor_scores.items())
     return tuple(explanation)

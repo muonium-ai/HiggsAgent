@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -97,6 +98,44 @@ def test_adaptive_scoring_uses_tie_break_rules_deterministically() -> None:
 
     assert selection.ranked_candidates[0].route.model_id == "openai/gpt-4o-mini"
     assert selection.ranked_candidates[1].route.model_id == "openai/gpt-4o"
+
+
+def test_adaptive_scoring_falls_back_to_deterministic_defaults_for_stale_telemetry() -> None:
+    semantics = _semantics(execution_target="auto", work_type="docs", tool_profile="none")
+    snapshot = build_adaptive_snapshot_from_attempt_summaries(
+        (
+            _summary("openrouter", "openai/gpt-4o", "succeeded", cost_usd=0.01, duration_ms=100),
+        ),
+        generated_at=datetime(2026, 3, 7, 12, 0, tzinfo=UTC),
+        freshness_reference=datetime(2026, 3, 7, 12, 0, tzinfo=UTC),
+    )
+    stale_snapshot = type(snapshot)(
+        source_kind=snapshot.source_kind,
+        generated_at=snapshot.generated_at,
+        entries=(
+            replace(
+                snapshot.entries[0],
+                freshness_state="stale",
+                telemetry_gaps=tuple(sorted((*snapshot.entries[0].telemetry_gaps, "stale_telemetry"))),
+            ),
+        ),
+    )
+
+    selection = select_adaptive_route(
+        semantics,
+        (
+            _candidate("openrouter", "openai/gpt-4o", "balanced", estimated_cost_usd=2.0),
+            _candidate("openrouter", "openai/gpt-4o-mini", "economy", estimated_cost_usd=0.35),
+        ),
+        stale_snapshot,
+    )
+
+    assert selection.selected_route.model_id == "openai/gpt-4o-mini"
+    assert all(candidate.used_deterministic_defaults for candidate in selection.ranked_candidates)
+    assert any(
+        item == "adaptive_default:deterministic"
+        for item in selection.ranked_candidates[0].explanation
+    )
 
 
 def test_adaptive_scoring_rejects_missing_eligible_candidates() -> None:

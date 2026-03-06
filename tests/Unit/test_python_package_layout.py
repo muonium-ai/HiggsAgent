@@ -13,6 +13,7 @@ def test_expected_package_directories_exist() -> None:
     base = Path("src/higgs_agent")
     for child in [
         "application",
+        "adaptive",
         "analytics",
         "tickets",
         "routing",

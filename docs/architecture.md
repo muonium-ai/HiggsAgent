@@ -185,3 +185,7 @@ Phase 2 now has a dedicated implementation contract in [phase-2-analytics-observ
 ## Phase 3 Hybrid Boundary
 
 Phase 3 now has a dedicated implementation contract in [phase-3-hybrid-execution.md](phase-3-hybrid-execution.md). That document is the authoritative scope boundary for shared hosted and local execution abstractions, bounded fallback behavior, and hybrid-runtime documentation, and should be treated as the parent contract for `T-000027` through `T-000030`.
+
+## Phase 4 Adaptive Boundary
+
+Phase 4 now has a dedicated implementation contract in [phase-4-adaptive-dispatch.md](phase-4-adaptive-dispatch.md). That document is the authoritative scope boundary for telemetry-backed scoring, adaptive route selection, explainability requirements, and adaptive dispatch documentation, and should be treated as the parent contract for `T-000031` through `T-000034`.

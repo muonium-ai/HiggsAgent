@@ -13,6 +13,7 @@ This guide routes contributors to setup, development workflow, and the contracts
 - [setup.md](setup.md)
 - [workflow.md](workflow.md)
 - [analytics.md](analytics.md)
+- [hybrid-execution.md](hybrid-execution.md)
 - [../runtime-tooling.md](../runtime-tooling.md)
 - [../repository-structure.md](../repository-structure.md)
 
@@ -27,3 +28,4 @@ This guide routes contributors to setup, development workflow, and the contracts
 - the runtime or environment contract changes
 - local validation commands change
 - repository package boundaries move
+- hosted versus local execution behavior changes

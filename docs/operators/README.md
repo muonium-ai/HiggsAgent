@@ -13,6 +13,7 @@ This guide routes operators to runtime, guardrail, observability, and artifact-h
 - [runbook.md](runbook.md)
 - [guardrails-and-artifacts.md](guardrails-and-artifacts.md)
 - [analytics.md](analytics.md)
+- [hybrid-execution.md](hybrid-execution.md)
 - [../safety-model.md](../safety-model.md)
 
 ## Normative Sources
@@ -26,3 +27,4 @@ This guide routes operators to runtime, guardrail, observability, and artifact-h
 - write policy changes
 - guardrail defaults change
 - retention or redaction rules change
+- hosted versus local execution behavior changes

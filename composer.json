@@ -1,0 +1,28 @@
+{
+  "name": "muonium-ai/higgs-agent",
+  "description": "Git-native autonomous agent dispatcher based on ticket semantics.",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.3"
+  },
+  "require-dev": {},
+  "autoload": {
+    "psr-4": {
+      "HiggsAgent\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "HiggsAgent\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "tickets:validate": "@php -r \"passthru('uv run python3 tickets/mt/muontickets/muontickets/mt.py validate', $code); exit($code);\""
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

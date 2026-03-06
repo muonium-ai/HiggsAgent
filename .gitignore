@@ -145,6 +145,14 @@ ENV/
 env.bak/
 venv.bak/
 
+# PHP / Composer
+/vendor/
+/.phpunit.cache/
+/.php-cs-fixer.cache
+
+# Higgs local runtime state
+/.higgs/
+
 # Spyder project settings
 .spyderproject
 .spyproject

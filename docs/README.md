@@ -17,6 +17,7 @@ These documents are the source of truth when guidance and implementation disagre
 
 - [architecture.md](architecture.md)
 - [phase-1-dispatcher-mvp.md](phase-1-dispatcher-mvp.md)
+- [phase-2-analytics-observability.md](phase-2-analytics-observability.md)
 - [runtime-tooling.md](runtime-tooling.md)
 - [repository-structure.md](repository-structure.md)
 - [ticket-semantics.md](ticket-semantics.md)

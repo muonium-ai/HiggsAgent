@@ -15,6 +15,10 @@ def load_json_fixture(relative_path: str) -> dict:
     return json.loads((FIXTURES / relative_path).read_text())
 
 
+def load_text_fixture(relative_path: str) -> str:
+    return (FIXTURES / relative_path).read_text()
+
+
 def load_markdown_frontmatter(relative_path: str) -> dict:
     content = (FIXTURES / relative_path).read_text()
     parts = content.split("---", 2)

@@ -1,0 +1,15 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "Generated patch summary."
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 36,
+    "total_tokens": 156,
+    "cost": 0.52
+  }
+}

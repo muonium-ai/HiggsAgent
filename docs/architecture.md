@@ -181,3 +181,7 @@ Phase 1 now has a dedicated implementation contract in [phase-1-dispatcher-mvp.m
 ## Phase 2 Analytics Boundary
 
 Phase 2 now has a dedicated implementation contract in [phase-2-analytics-observability.md](phase-2-analytics-observability.md). That document is the authoritative scope boundary for analytics aggregation, reporting, and retention-safe observability work, and should be treated as the parent contract for `T-000023` through `T-000026`.
+
+## Phase 3 Hybrid Boundary
+
+Phase 3 now has a dedicated implementation contract in [phase-3-hybrid-execution.md](phase-3-hybrid-execution.md). That document is the authoritative scope boundary for shared hosted and local execution abstractions, bounded fallback behavior, and hybrid-runtime documentation, and should be treated as the parent contract for `T-000027` through `T-000030`.

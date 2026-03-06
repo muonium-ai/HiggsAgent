@@ -19,6 +19,7 @@ These documents are the source of truth when guidance and implementation disagre
 - [phase-1-dispatcher-mvp.md](phase-1-dispatcher-mvp.md)
 - [phase-2-analytics-observability.md](phase-2-analytics-observability.md)
 - [phase-2-analytics-metric-model.md](phase-2-analytics-metric-model.md)
+- [phase-3-hybrid-execution.md](phase-3-hybrid-execution.md)
 - [runtime-tooling.md](runtime-tooling.md)
 - [repository-structure.md](repository-structure.md)
 - [ticket-semantics.md](ticket-semantics.md)

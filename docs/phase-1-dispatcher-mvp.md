@@ -72,6 +72,7 @@ Phase 1 may rely only on approved Phase 0 contracts:
 - Output: explainable hosted route selection
 - Must remain deterministic for the same normalized input set
 - Must not silently convert `local` execution requests into hosted execution
+- Output must expose selected provider, model id, route family, estimated cost band, and rationale strings suitable for later event logging
 
 ### 4. Executor Boundary
 

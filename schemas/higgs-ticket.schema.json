@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muonium.ai/schemas/higgs-ticket.schema.json",
+  "title": "Higgs Ticket Semantics",
+  "description": "HiggsAgent routing semantics layered on top of MuonTickets frontmatter.",
+  "type": "object",
+  "required": [
+    "higgs_schema_version",
+    "higgs_platform"
+  ],
+  "properties": {
+    "higgs_schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Semantic contract version used by the Higgs classifier and router."
+    },
+    "higgs_platform": {
+      "type": "string",
+      "enum": [
+        "agnostic",
+        "web",
+        "ios",
+        "macos",
+        "android",
+        "linux",
+        "windows",
+        "cross_platform",
+        "repo"
+      ],
+      "default": "agnostic",
+      "description": "Primary platform or execution surface for routing decisions."
+    },
+    "higgs_complexity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium",
+      "description": "Optional explicit complexity override. If omitted, it is derived from effort."
+    },
+    "higgs_execution_target": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "hosted",
+        "local"
+      ],
+      "default": "auto",
+      "description": "Execution preference used by the dispatcher and future hybrid runtime."
+    },
+    "higgs_tool_profile": {
+      "type": "string",
+      "enum": [
+        "none",
+        "standard",
+        "extended"
+      ],
+      "default": "standard",
+      "description": "Coarse capability hint for allowed tool usage during execution."
+    }
+  },
+  "additionalProperties": true
+}

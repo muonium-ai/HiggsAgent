@@ -173,3 +173,7 @@ Implement in this order:
 3. Re-evaluate downstream decomposition after the Phase 0 contracts are accepted
 
 The repository should not start coding the dispatcher core before the architecture contracts above are captured in tickets and resolved.
+
+## Phase 1 MVP Boundary
+
+Phase 1 now has a dedicated implementation contract in [phase-1-dispatcher-mvp.md](phase-1-dispatcher-mvp.md). That document is the authoritative scope boundary for the deterministic dispatcher milestone and should be treated as the parent contract for `T-000011` through `T-000017`.

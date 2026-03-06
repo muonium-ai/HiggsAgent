@@ -16,6 +16,7 @@ This directory contains both normative contract documents and audience-focused g
 These documents are the source of truth when guidance and implementation disagree:
 
 - [architecture.md](architecture.md)
+- [phase-1-dispatcher-mvp.md](phase-1-dispatcher-mvp.md)
 - [runtime-tooling.md](runtime-tooling.md)
 - [repository-structure.md](repository-structure.md)
 - [ticket-semantics.md](ticket-semantics.md)

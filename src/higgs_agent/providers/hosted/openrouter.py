@@ -12,6 +12,7 @@ from higgs_agent.events import AttemptSummaryBuilder, EventStreamBuilder
 from higgs_agent.providers.contract import (
     ExecutorInput,
     ExecutorLimits,
+    ProviderExecutionResult,
     ProviderToolCall,
     ProviderToolDefinition,
     ProviderToolInvocationResult,
@@ -37,17 +38,7 @@ class OpenRouterExecutorError(ValueError):
     """Raised when executor configuration or response handling is invalid."""
 
 
-@dataclass(frozen=True, slots=True)
-class OpenRouterExecutionResult:
-    """Normalized result returned by the hosted executor boundary."""
-
-    status: str
-    output_text: str
-    tool_calls: tuple[ProviderToolCall, ...]
-    usage: ProviderUsage | None
-    events: tuple[dict[str, object], ...]
-    attempt_summary: dict[str, object]
-    retry_count: int
+OpenRouterExecutionResult = ProviderExecutionResult
 
 
 def load_executor_limits(config_path: Path) -> ExecutorLimits:
@@ -95,7 +86,7 @@ class OpenRouterExecutor:
         execution_input: ExecutorInput,
         *,
         tool_invoker: ToolInvoker | None = None,
-    ) -> OpenRouterExecutionResult:
+    ) -> ProviderExecutionResult:
         events = EventStreamBuilder(
             run_id=execution_input.run_id,
             attempt_id=execution_input.attempt_id,
@@ -142,7 +133,7 @@ class OpenRouterExecutor:
                     "retryable": False,
                 },
             )
-            return OpenRouterExecutionResult(
+            return ProviderExecutionResult(
                 status="blocked",
                 output_text="",
                 tool_calls=(),
@@ -290,7 +281,7 @@ class OpenRouterExecutor:
                 retry_count=retry_count,
                 usage=usage,
             )
-            return OpenRouterExecutionResult(
+            return ProviderExecutionResult(
                 status="succeeded",
                 output_text=output_text,
                 tool_calls=tool_calls,
@@ -421,7 +412,7 @@ class OpenRouterExecutor:
         *,
         usage: ProviderUsage | None = None,
         tool_calls: tuple[ProviderToolCall, ...] = (),
-    ) -> OpenRouterExecutionResult:
+    ) -> ProviderExecutionResult:
         events.append("execution.completed", "failed", usage=usage, error=error)
         attempt_summary = summary.build(
             final_result="failed",
@@ -432,7 +423,7 @@ class OpenRouterExecutor:
             usage=usage,
             error=error,
         )
-        return OpenRouterExecutionResult(
+        return ProviderExecutionResult(
             status="failed",
             output_text="",
             tool_calls=tool_calls,

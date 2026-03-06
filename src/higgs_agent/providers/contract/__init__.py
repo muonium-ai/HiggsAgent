@@ -2,6 +2,8 @@
 
 from .models import (
 	ExecutorArtifactRef,
+	ProviderExecutionResult,
+	ProviderExecutor,
 	ExecutorInput,
 	ExecutorLimits,
 	ProviderToolCall,
@@ -12,6 +14,8 @@ from .models import (
 
 __all__ = [
 	"ExecutorArtifactRef",
+	"ProviderExecutionResult",
+	"ProviderExecutor",
 	"ExecutorInput",
 	"ExecutorLimits",
 	"ProviderToolCall",

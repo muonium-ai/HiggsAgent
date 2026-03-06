@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from higgs_agent.routing import RouteDecision
 
@@ -44,6 +45,12 @@ class ProviderUsage:
     total_tokens: int | None = None
     cost_usd: float | None = None
     latency_ms: int | None = None
+
+    @property
+    def has_precise_billing(self) -> bool:
+        """Whether the usage payload includes exact billing data."""
+
+        return self.cost_usd is not None
 
     def as_schema_payload(self) -> dict[str, int | float]:
         payload: dict[str, int | float] = {}
@@ -115,3 +122,23 @@ class ExecutorInput:
     repo_head: str | None = None
     allow_tool_calls: bool = True
     tools: tuple[ProviderToolDefinition, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderExecutionResult:
+    """Normalized execution result shared by hosted and local provider adapters."""
+
+    status: str
+    output_text: str
+    tool_calls: tuple[ProviderToolCall, ...]
+    usage: ProviderUsage | None
+    events: tuple[dict[str, object], ...]
+    attempt_summary: dict[str, object]
+    retry_count: int
+
+
+class ProviderExecutor(Protocol):
+    """Shared executor boundary used by hosted and local provider adapters."""
+
+    def execute(self, execution_input: ExecutorInput, *, tool_invoker=None) -> ProviderExecutionResult:
+        """Execute a route and return a normalized provider result."""

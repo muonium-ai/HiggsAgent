@@ -17,6 +17,7 @@ def test_expected_package_directories_exist() -> None:
         "tickets",
         "routing",
         "providers",
+        "providers/local",
         "guardrails",
         "validation",
         "events",

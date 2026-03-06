@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from higgs_agent.providers.contract import ExecutorInput
-from higgs_agent.providers.hosted import OpenRouterExecutionResult, OpenRouterTransport
+from higgs_agent.providers.contract import ExecutorInput, ProviderExecutionResult
+from higgs_agent.providers.hosted import OpenRouterTransport
 from higgs_agent.routing import NormalizedTicketSemantics, RouteDecision
 from higgs_agent.tickets import TicketRecord, scan_ticket_directory, select_next_ready_ticket
 from higgs_agent.validation import ProposedFileChange, ValidationDecision
@@ -19,7 +19,7 @@ class DispatchOutcome:
     ticket: TicketRecord
     semantics: NormalizedTicketSemantics
     route: RouteDecision
-    execution_result: OpenRouterExecutionResult
+    execution_result: ProviderExecutionResult
     validation_decision: ValidationDecision
 
 

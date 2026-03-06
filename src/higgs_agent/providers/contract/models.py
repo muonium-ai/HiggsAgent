@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from higgs_agent.routing import RouteDecision
@@ -135,6 +135,7 @@ class ProviderExecutionResult:
     events: tuple[dict[str, object], ...]
     attempt_summary: dict[str, object]
     retry_count: int
+    metadata: dict[str, object] = field(default_factory=dict)
 
 
 class ProviderExecutor(Protocol):

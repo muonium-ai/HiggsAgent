@@ -17,6 +17,19 @@ class FakeTransport:
         return self._responses.pop(0)
 
 
+class FakeLocalTransport:
+    def __init__(self, responses: list[dict[str, object] | Exception]) -> None:
+        self._responses = responses
+        self.calls: list[tuple[str, str | None, int]] = []
+
+    def generate(self, prompt: str, system_prompt: str | None, timeout_ms: int) -> dict[str, object]:
+        self.calls.append((prompt, system_prompt, timeout_ms))
+        response = self._responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 def test_dispatcher_pipeline_accepts_clean_allowed_changes(tmp_path: Path) -> None:
     tickets_dir = _write_ticket_fixture(tmp_path, "tickets/dispatcher_ready_docs.md")
     transport = FakeTransport([load_json_fixture("provider/openrouter_success_minimal.json")])
@@ -81,6 +94,64 @@ def test_dispatcher_pipeline_blocks_local_execution_before_transport(tmp_path: P
     assert outcome.validation_decision.decision == "rejected"
     assert outcome.validation_decision.reason == "executor_did_not_succeed"
     assert transport.calls == []
+
+
+def test_dispatcher_pipeline_executes_explicit_local_route_when_transport_is_available(tmp_path: Path) -> None:
+    tickets_dir = _write_ticket_fixture(tmp_path, "tickets/dispatcher_ready_local.md")
+    transport = FakeTransport([])
+    local_transport = FakeLocalTransport(
+        [
+            {
+                "output_text": "Local execution completed",
+                "usage": {"prompt_tokens": 12, "completion_tokens": 6, "total_tokens": 18},
+            }
+        ]
+    )
+
+    outcome = dispatch_next_ready_ticket(
+        tickets_dir,
+        transport=transport,
+        local_transport=local_transport,
+        guardrails_path=Path("config/guardrails.example.json"),
+        write_policy_path=Path("config/write-policy.example.json"),
+        planned_changes=(),
+        validation_summary="local execution succeeded",
+    )
+
+    assert outcome is not None
+    assert outcome.route.provider == "local"
+    assert outcome.execution_result.status == "succeeded"
+    assert outcome.execution_result.output_text == "Local execution completed"
+    assert outcome.execution_result.metadata["fallback_triggered"] is False
+    assert local_transport.calls
+    assert transport.calls == []
+
+
+def test_dispatcher_pipeline_falls_back_from_local_to_hosted_for_auto_route(tmp_path: Path) -> None:
+    tickets_dir = _write_ticket_fixture(tmp_path, "tickets/dispatcher_ready_docs.md")
+    transport = FakeTransport([load_json_fixture("provider/openrouter_success_minimal.json")])
+    local_transport = FakeLocalTransport([TimeoutError("local runtime unavailable")])
+
+    outcome = dispatch_next_ready_ticket(
+        tickets_dir,
+        transport=transport,
+        local_transport=local_transport,
+        guardrails_path=Path("config/guardrails.example.json"),
+        write_policy_path=Path("config/write-policy.example.json"),
+        planned_changes=(),
+        validation_summary="local fallback to hosted succeeded",
+    )
+
+    assert outcome is not None
+    assert outcome.route.provider == "local"
+    assert outcome.execution_result.status == "succeeded"
+    assert outcome.execution_result.output_text == "Generated patch summary."
+    assert outcome.execution_result.retry_count == 1
+    assert outcome.execution_result.metadata["fallback_triggered"] is True
+    assert outcome.execution_result.metadata["fallback_route"]["provider"] == "openrouter"
+    assert "retry.scheduled" in [event["event_type"] for event in outcome.execution_result.events]
+    assert local_transport.calls
+    assert transport.calls
 
 
 def _write_ticket_fixture(tmp_path: Path, relative_fixture_path: str) -> Path:

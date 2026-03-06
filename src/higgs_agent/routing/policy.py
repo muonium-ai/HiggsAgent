@@ -1,4 +1,4 @@
-"""Deterministic Phase 1 routing policy for hosted model selection."""
+"""Deterministic hybrid routing policy for hosted and local model selection."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class RouteGuardrails:
 
 @dataclass(frozen=True, slots=True)
 class RouteProfile:
-    """Hosted route profile available to the deterministic router."""
+    """Provider route profile available to the deterministic router."""
 
     provider: str
     model_id: str
@@ -73,6 +73,14 @@ DEEP_ROUTE = RouteProfile(
     supports_extended_tools=True,
     supports_platform_sensitive_work=False,
 )
+LOCAL_ROUTE = RouteProfile(
+    provider="local",
+    model_id="local/llama3.1:8b",
+    route_family="local",
+    estimated_cost_usd=0.0,
+    supports_extended_tools=False,
+    supports_platform_sensitive_work=False,
+)
 
 
 def load_route_guardrails(config_path: Path) -> RouteGuardrails:
@@ -94,9 +102,12 @@ def load_route_guardrails(config_path: Path) -> RouteGuardrails:
 
 
 def choose_route(
-    semantics: NormalizedTicketSemantics, guardrails: RouteGuardrails
+    semantics: NormalizedTicketSemantics,
+    guardrails: RouteGuardrails,
+    *,
+    local_execution_enabled: bool = False,
 ) -> RouteDecision:
-    """Choose an explainable hosted route or return an explicit block."""
+    """Choose an explainable hybrid route or return an explicit block."""
 
     rationale: list[str] = [
         f"work_type:{semantics.work_type}",
@@ -106,23 +117,37 @@ def choose_route(
         f"execution_target:{semantics.execution_target}",
         f"tool_profile:{semantics.tool_profile}",
         f"max_cost_usd:{guardrails.max_cost_usd:.2f}",
+        f"local_execution_enabled:{str(local_execution_enabled).lower()}",
     ]
 
     if semantics.execution_target == "local":
-        rationale.append("blocked:phase_1_hosted_only")
-        return RouteDecision(
-            ticket_id=semantics.ticket_id,
-            priority=semantics.priority,
-            selected=False,
-            provider=None,
-            model_id=None,
-            route_family=None,
-            estimated_cost_usd=None,
-            requires_tool_calls=semantics.tool_profile != "none",
-            blocked_reason="local_execution_not_supported_in_phase_1",
-            rationale=tuple(rationale),
-        )
+        if not local_execution_enabled:
+            rationale.append("blocked:local_runtime_unavailable")
+            return _blocked_route(semantics, rationale, "local_execution_not_configured")
+        if semantics.tool_profile != "none":
+            rationale.append("blocked:local_route_requires_toolless_request")
+            return _blocked_route(semantics, rationale, "local_execution_requires_toolless_route")
+        rationale.append("hybrid_policy:explicit_local_route")
+        return _selected_route(semantics, LOCAL_ROUTE, rationale)
 
+    if semantics.execution_target == "auto" and local_execution_enabled:
+        auto_local_rationale = _auto_local_rationale(semantics)
+        rationale.extend(auto_local_rationale)
+        if auto_local_rationale[-1] == "hybrid_policy:auto_prefers_local":
+            return _selected_route(semantics, LOCAL_ROUTE, rationale)
+    elif semantics.execution_target == "auto":
+        rationale.append("hybrid_policy:auto_hosted_local_unavailable")
+    else:
+        rationale.append("hybrid_policy:explicit_hosted_route")
+
+    return _choose_hosted_route(semantics, guardrails, rationale)
+
+
+def _choose_hosted_route(
+    semantics: NormalizedTicketSemantics,
+    guardrails: RouteGuardrails,
+    rationale: list[str],
+) -> RouteDecision:
     candidates = _candidate_routes(semantics, rationale)
     candidates = _filter_tool_profile(candidates, semantics, rationale)
 
@@ -131,25 +156,31 @@ def choose_route(
     ]
     if not affordable:
         rationale.append("blocked:budget_exceeded_for_all_routes")
-        return RouteDecision(
-            ticket_id=semantics.ticket_id,
-            priority=semantics.priority,
-            selected=False,
-            provider=None,
-            model_id=None,
-            route_family=None,
-            estimated_cost_usd=None,
-            requires_tool_calls=semantics.tool_profile != "none",
-            blocked_reason="no_route_within_cost_ceiling",
-            rationale=tuple(rationale),
-        )
+        return _blocked_route(semantics, rationale, "no_route_within_cost_ceiling")
 
     selected_route = affordable[0]
     if selected_route is not candidates[0]:
         rationale.append(f"budget_fallback:{candidates[0].model_id}->{selected_route.model_id}")
+    return _selected_route(semantics, selected_route, rationale)
+
+
+def _auto_local_rationale(semantics: NormalizedTicketSemantics) -> list[str]:
+    if semantics.tool_profile != "none":
+        return ["hybrid_policy:auto_hosted_due_tool_profile"]
+    if semantics.platform not in {"agnostic", "repo"}:
+        return ["hybrid_policy:auto_hosted_due_platform"]
+    if semantics.work_type in {"docs", "chore", "spec"} and semantics.complexity != "high":
+        return ["hybrid_policy:auto_local_for_low_risk_ticket", "hybrid_policy:auto_prefers_local"]
+    return ["hybrid_policy:auto_hosted_due_capability_preference"]
+
+
+def _selected_route(
+    semantics: NormalizedTicketSemantics,
+    selected_route: RouteProfile,
+    rationale: list[str],
+) -> RouteDecision:
     rationale.append(f"selected_model:{selected_route.model_id}")
     rationale.append(f"selected_family:{selected_route.route_family}")
-
     return RouteDecision(
         ticket_id=semantics.ticket_id,
         priority=semantics.priority,
@@ -160,6 +191,25 @@ def choose_route(
         estimated_cost_usd=selected_route.estimated_cost_usd,
         requires_tool_calls=semantics.tool_profile != "none",
         blocked_reason=None,
+        rationale=tuple(rationale),
+    )
+
+
+def _blocked_route(
+    semantics: NormalizedTicketSemantics,
+    rationale: list[str],
+    blocked_reason: str,
+) -> RouteDecision:
+    return RouteDecision(
+        ticket_id=semantics.ticket_id,
+        priority=semantics.priority,
+        selected=False,
+        provider=None,
+        model_id=None,
+        route_family=None,
+        estimated_cost_usd=None,
+        requires_tool_calls=semantics.tool_profile != "none",
+        blocked_reason=blocked_reason,
         rationale=tuple(rationale),
     )
 

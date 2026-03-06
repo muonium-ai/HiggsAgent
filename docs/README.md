@@ -21,6 +21,7 @@ These documents are the source of truth when guidance and implementation disagre
 - [phase-2-analytics-metric-model.md](phase-2-analytics-metric-model.md)
 - [phase-3-hybrid-execution.md](phase-3-hybrid-execution.md)
 - [phase-4-adaptive-dispatch.md](phase-4-adaptive-dispatch.md)
+- [phase-5-benchmarking-mode.md](phase-5-benchmarking-mode.md)
 - [runtime-tooling.md](runtime-tooling.md)
 - [repository-structure.md](repository-structure.md)
 - [ticket-semantics.md](ticket-semantics.md)

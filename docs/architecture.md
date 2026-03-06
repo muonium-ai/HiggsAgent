@@ -189,3 +189,7 @@ Phase 3 now has a dedicated implementation contract in [phase-3-hybrid-execution
 ## Phase 4 Adaptive Boundary
 
 Phase 4 now has a dedicated implementation contract in [phase-4-adaptive-dispatch.md](phase-4-adaptive-dispatch.md). That document is the authoritative scope boundary for telemetry-backed scoring, adaptive route selection, explainability requirements, and adaptive dispatch documentation, and should be treated as the parent contract for `T-000031` through `T-000034`.
+
+## Phase 5 Benchmarking Boundary
+
+Phase 5 now has a dedicated implementation contract in [phase-5-benchmarking-mode.md](phase-5-benchmarking-mode.md). That document is the authoritative scope boundary for comparable benchmark workloads, isolated multi-provider execution harnesses, ranking and quality reporting, reproducibility requirements, and public benchmarking documentation, and should be treated as the parent contract for `T-000035` through `T-000039`.

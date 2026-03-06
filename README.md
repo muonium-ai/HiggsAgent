@@ -4,7 +4,7 @@ HiggsAgent is a Git-native autonomous agent dispatcher that routes work based on
 
 ## Status
 
-The repository is currently through Phase 3 hybrid execution foundations. The dispatcher runtime now includes deterministic hosted and local route selection, bounded fallback behavior, normalized observability, analytics reporting, and write-gate validation.
+The repository is currently through Phase 4 adaptive dispatch foundations. The runtime now includes deterministic hosted and local route selection, bounded fallback behavior, normalized observability, analytics reporting, adaptive telemetry ingestion, explainable adaptive scoring surfaces, and write-gate validation.
 
 ## Runtime Model
 

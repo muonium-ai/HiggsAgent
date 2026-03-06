@@ -1,0 +1,1 @@
+"""Ticket loading and eligibility logic."""

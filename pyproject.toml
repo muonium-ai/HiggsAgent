@@ -1,0 +1,32 @@
+[project]
+name = "higgs-agent"
+version = "0.1.0"
+description = "Git-native autonomous agent dispatcher based on ticket semantics."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "jsonschema>=4.23.0",
+  "pytest>=8.3.0",
+  "pyyaml>=6.0.3",
+  "ruff>=0.11.0"
+]
+
+[project.scripts]
+higgs-agent = "higgs_agent.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

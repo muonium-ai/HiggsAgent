@@ -9,7 +9,7 @@
   "protected_paths": [
     ".github/**",
     "tickets/**",
-    "composer.json",
+    "pyproject.toml",
     "Makefile",
     "config/write-policy.example.json",
     "config/guardrails.example.json"

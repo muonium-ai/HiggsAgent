@@ -5,5 +5,5 @@
 /config/** @senthil
 /schemas/** @senthil
 /.github/** @senthil
-/composer.json @senthil
+/pyproject.toml @senthil
 /Makefile @senthil

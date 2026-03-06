@@ -19,7 +19,7 @@ Use this structure when an automated run cannot safely complete without human re
 Ticket ID: T-000015
 Run ID: run-123
 Attempt ID: attempt-1
-Changed paths: src/Dispatcher.php, config/write-policy.example.json
+Changed paths: src/higgs_agent/routing/policy.py, config/write-policy.example.json
 Validation summary: tests passed, write gate blocked
 Guardrail usage summary: tokens 8200/24000, cost 0.91/5.00, tool calls 3/8
 Blocking reason: protected path touched and human review required

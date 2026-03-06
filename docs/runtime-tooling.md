@@ -6,41 +6,40 @@ This document defines the supported runtime and tooling model for HiggsAgent dur
 
 ## Contract
 
-- Product runtime: PHP 8.3 CLI
-- Product package manager: Composer
-- Auxiliary tooling runtime: Python 3.12+
-- Auxiliary tooling manager: `uv`
+- Product runtime: Python 3.12+
+- Product package, environment, and execution manager: `uv`
+- Ticket tooling runtime: Python 3.12+
+- Ticket tooling manager: `uv`
 - Task runner: `make`
 
 ## Boundary Rules
 
-- Product logic belongs in PHP.
+- Product logic belongs in Python.
 - Ticket lifecycle operations remain in MuonTickets and continue to run through Python.
 - Portable assets such as schemas and configuration should be language-neutral wherever possible.
 - Future ports to Rust, Go, or Zig must be able to reuse schemas and config without rewriting contracts.
 
 ## Why This Split Exists
 
-The PRD states that HiggsAgent will start in PHP while the repository already uses `uv` for MuonTickets. The cleanest contract is to keep `uv` as auxiliary tooling only and treat PHP plus Composer as the product runtime surface.
+The repository contract is that HiggsAgent itself is implemented in Python and managed with `uv`. The earlier PHP assumption is superseded by this decision.
 
 This avoids three common problems:
 
-1. Blurring product runtime logic with repository automation.
-2. Requiring contributors to guess which tool owns which workflows.
-3. Making later runtime ports depend on Python-specific behavior.
+1. Splitting product logic across two runtime stacks before the first implementation exists.
+2. Requiring contributors to guess whether Composer or `uv` is the authoritative environment manager.
+3. Making later ports depend on an unnecessary transitional runtime.
 
 ## Supported Contributor Surface
 
 Contributors should rely on:
 
-- `composer` for PHP dependency installation and PHP-centric scripts.
+- `uv sync` for environment and dependency installation.
+- `uv run ...` for project commands.
 - `uv run python3 tickets/mt/muontickets/muontickets/mt.py ...` for ticket board operations.
-- `make` for top-level project commands that wrap both PHP and Python tooling.
+- `make` for top-level project commands that wrap the `uv`-managed command surface.
 
 ## Initial Supported Environment
 
-- PHP 8.3+
-- Composer 2+
 - Python 3.12+
 - `uv`
 - macOS and Linux for local contributor workflows
@@ -49,9 +48,8 @@ Contributors should rely on:
 
 These are intentionally not committed yet:
 
-- PHAR packaging
 - Docker-based development workflow
-- Global installer or Homebrew formula
+- Standalone binary packaging
 - Local model runtime packaging
 - Production deployment topology
 
@@ -59,21 +57,21 @@ These are intentionally not committed yet:
 
 The project should maintain two distinct CI lanes once CI is added:
 
-1. PHP lane for product runtime validation.
-2. Python lane for ticket tooling and auxiliary repository checks.
+1. Python product lane for HiggsAgent runtime validation.
+2. Python tooling lane for ticket tooling and auxiliary repository checks.
 
-The two lanes should stay independent so later runtime changes do not unintentionally couple product code to repository automation.
+The two lanes should stay logically independent even though both use Python, so product code does not become tightly coupled to ticket automation internals.
 
 ## Required Root Files
 
 This contract expects the following root-level files to exist:
 
-- `composer.json`
+- `pyproject.toml`
 - `Makefile`
 - `.env.example`
 - `README.md`
 
 ## Risks
 
-- If the project later abandons PHP earlier than expected, the Composer-based contract will need to be revised.
-- If repository automation starts carrying product logic, the runtime boundary will erode and later phases will become harder to port.
+- If repository automation starts carrying product logic that bypasses the package root, the runtime boundary will erode and later phases will become harder to port.
+- If the project adds unmanaged scripts outside `uv`, contributor reproducibility will degrade quickly.

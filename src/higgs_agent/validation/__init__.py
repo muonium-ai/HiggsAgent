@@ -1,0 +1,1 @@
+"""Output validation and write gating."""

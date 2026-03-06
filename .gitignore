@@ -145,10 +145,9 @@ ENV/
 env.bak/
 venv.bak/
 
-# PHP / Composer
-/vendor/
-/.phpunit.cache/
-/.php-cs-fixer.cache
+# Python project artifacts
+/build/
+/dist/
 
 # Higgs local runtime state
 /.higgs/

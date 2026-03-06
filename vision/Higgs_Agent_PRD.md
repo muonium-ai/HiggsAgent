@@ -20,12 +20,12 @@ white-box system that tracks:
 -   Execution timing
 -   Retry statistics
 
-Initial implementation will be built in **PHP (managed via uv)**, with
+Initial implementation will be built in **Python (managed via uv)**, with
 future plans to port to a high-performance CLI runtime (Rust/Go/Zig).
 
 ------------------------------------------------------------------------
 
-# Phase 1 -- Deterministic Dispatcher (PHP + OpenRouter)
+# Phase 1 -- Deterministic Dispatcher (Python + OpenRouter)
 
 ## Objectives
 
@@ -120,12 +120,11 @@ Support both:
 
 Routing example:
 
-``` php
-if ($ticket->complexity == "low") {
-    use_local_model();
-} else {
-    use_hosted_model();
-}
+``` python
+if ticket["complexity"] == "low":
+  use_local_model()
+else:
+  use_hosted_model()
 ```
 
 ------------------------------------------------------------------------

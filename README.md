@@ -8,25 +8,31 @@ The repository is currently in Phase 0 foundation work. The dispatcher runtime i
 
 ## Runtime Model
 
-- Product runtime: PHP 8.3 CLI
-- Product dependency management: Composer
-- Auxiliary tooling: Python 3.12+ managed with `uv`
+- Product runtime: Python 3.12+
+- Product dependency and environment management: `uv`
+- Ticket and auxiliary tooling: Python 3.12+ managed with `uv`
 - Ticket workflow: MuonTickets under `tickets/mt/muontickets`
 - Top-level task entrypoint: `make`
 
-`uv` is used for ticket automation and auxiliary repository tooling. It is not the product runtime for HiggsAgent itself.
+`uv` is the package, environment, and execution entrypoint for HiggsAgent itself and for the repository's Python tooling.
 
 ## Quickstart
 
-1. Install PHP 8.3+, Composer, Python 3.12+, and `uv`.
-2. Initialize MuonTickets if needed:
+1. Install Python 3.12+ and `uv`.
+2. Sync the workspace environment:
+
+	```bash
+	uv sync --extra dev
+	```
+
+3. Validate MuonTickets if needed:
 
 	```bash
 	uv run python3 tickets/mt/muontickets/muontickets/mt.py validate
 	```
 
-3. Review the runtime contract in [docs/runtime-tooling.md](docs/runtime-tooling.md).
-4. Use `make help` for the documented task surface.
+4. Review the runtime contract in [docs/runtime-tooling.md](docs/runtime-tooling.md).
+5. Use `make help` for the documented task surface.
 
 ## Repository Guides
 

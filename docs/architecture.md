@@ -38,10 +38,10 @@ This document defines the initial architecture direction used to create the back
 
 ### Runtime and Tooling
 
-The PRD states that the initial runtime will be PHP while also referencing `uv`. That combination is not yet an operational contract. The foundation phase must define:
+The working runtime contract is now Python managed with `uv`. Earlier PHP references in the initial PRD are superseded by this repository decision. The foundation phase must define:
 
-- how the PHP runtime is installed and invoked
-- whether `uv` is only used for auxiliary tooling, ticket automation, and tests
+- how the Python runtime is installed and invoked
+- how `uv` manages the project environment, dependency graph, and execution entrypoints
 - how local development, CI, and packaging work
 - what can be considered stable for open-source contributors
 
@@ -49,11 +49,11 @@ The PRD states that the initial runtime will be PHP while also referencing `uv`.
 
 The repo should separate shared hotspots from isolated work areas so multiple agents can contribute safely. A likely direction is:
 
-- `src/` for core dispatcher logic
-- `src/Providers/` or equivalent for provider adapters
+- `src/higgs_agent/` for the Python package root
+- `src/higgs_agent/providers/` for provider adapters
 - `config/` for routing and guardrail configuration
 - `schemas/` for Higgs-specific ticket and event contracts
-- `tests/` for unit, integration, and simulation coverage
+- `tests/` for Python unit, integration, contract, and simulation coverage
 - `docs/` for contributor, operator, and architecture docs
 
 This structure is intentionally provisional until the runtime/tooling contract is finalized.

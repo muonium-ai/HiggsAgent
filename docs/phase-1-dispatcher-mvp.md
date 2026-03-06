@@ -56,6 +56,7 @@ Phase 1 may rely only on approved Phase 0 contracts:
 - Input: repository ticket paths and parsed ticket records
 - Output: deterministic candidate set limited to valid `ready` tickets
 - Must reject blocked, invalid, or non-routable tickets without invoking routing or execution
+- Selection order for ready candidates is workflow-only: priority first, then ticket id for stable tie-breaking
 
 ### 2. Classifier Boundary
 

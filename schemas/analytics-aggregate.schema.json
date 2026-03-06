@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muonium.ai/schemas/analytics-aggregate.schema.json",
+  "title": "Higgs Analytics Aggregate",
+  "description": "Normalized aggregate metrics derived from execution attempt summaries and event streams.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "aggregate_id",
+    "generated_at",
+    "window",
+    "group_by",
+    "source",
+    "metrics"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "aggregate_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "window": {
+      "type": "object",
+      "required": [
+        "start_at",
+        "end_at",
+        "granularity"
+      ],
+      "properties": {
+        "start_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "granularity": {
+          "type": "string",
+          "enum": [
+            "hour",
+            "day",
+            "week",
+            "month",
+            "all",
+            "custom"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "group_by": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "provider",
+          "model",
+          "ticket_type",
+          "ticket_priority",
+          "higgs_platform",
+          "higgs_complexity",
+          "final_result",
+          "error_kind"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "dimensions": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "ticket_type": {
+          "type": "string"
+        },
+        "ticket_priority": {
+          "type": "string",
+          "enum": [
+            "p0",
+            "p1",
+            "p2"
+          ]
+        },
+        "higgs_platform": {
+          "type": "string",
+          "enum": [
+            "agnostic",
+            "web",
+            "ios",
+            "macos",
+            "android",
+            "linux",
+            "windows",
+            "cross_platform",
+            "repo"
+          ]
+        },
+        "higgs_complexity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "final_result": {
+          "type": "string",
+          "enum": [
+            "succeeded",
+            "failed",
+            "blocked",
+            "skipped"
+          ]
+        },
+        "error_kind": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "tool",
+            "validation",
+            "guardrail",
+            "timeout",
+            "internal",
+            "coordination"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "attempt_summary_count",
+        "event_count",
+        "used_event_backfill",
+        "export_safe"
+      ],
+      "properties": {
+        "attempt_summary_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "used_event_backfill": {
+          "type": "boolean"
+        },
+        "export_safe": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "attempts_total",
+        "distinct_ticket_count",
+        "succeeded_count",
+        "failed_count",
+        "blocked_count",
+        "skipped_count",
+        "success_rate",
+        "failure_rate",
+        "blocked_rate",
+        "skipped_rate",
+        "retried_attempt_count",
+        "retry_count_total",
+        "tool_call_count_total",
+        "tool_call_count_avg",
+        "duration_ms_total",
+        "duration_ms_avg",
+        "tokens_prompt_total",
+        "tokens_completion_total",
+        "total_tokens_total",
+        "cost_usd_total",
+        "cost_usd_avg",
+        "error_kind_counts"
+      ],
+      "properties": {
+        "attempts_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distinct_ticket_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "succeeded_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "success_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "failure_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blocked_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "skipped_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "retried_attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retry_count_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_call_count_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_call_count_avg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_ms_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_ms_avg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tokens_prompt_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens_completion_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_tokens_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_usd_total": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cost_usd_avg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "error_kind_counts": {
+          "type": "object",
+          "required": [
+            "provider",
+            "tool",
+            "validation",
+            "guardrail",
+            "timeout",
+            "internal",
+            "coordination"
+          ],
+          "properties": {
+            "provider": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "validation": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "guardrail": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timeout": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "internal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "coordination": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

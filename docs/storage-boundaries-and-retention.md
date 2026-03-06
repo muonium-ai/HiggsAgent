@@ -26,6 +26,8 @@ HiggsAgent separates committed repository artifacts from local execution artifac
 - `.higgs/local/runs/<run_id>/<attempt_id>/events.ndjson`
 - `.higgs/local/runs/<run_id>/<attempt_id>/artifacts/`
 - `.higgs/local/analytics/attempt-summaries.ndjson`
+- `.higgs/local/analytics/aggregates/<window>.ndjson`
+- `.higgs/local/analytics/exports/<generated_at>.json`
 
 These paths are intentionally ignored by version control.
 
@@ -40,6 +42,7 @@ These paths are intentionally ignored by version control.
 - Raw prompts, raw responses, and provider payloads: 14 days local-only
 - Tool stdout and stderr: 14 days local-only
 - Event streams and normalized attempt summaries: 90 days local-only
+- Local aggregate analytics snapshots: 90 days local-only by default
 - Sanitized aggregate analytics exports: longer retention if they contain no raw or secret-bearing content
 
 ## Write Policy Interaction

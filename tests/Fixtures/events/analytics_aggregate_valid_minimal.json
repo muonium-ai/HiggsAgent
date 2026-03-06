@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "aggregate_id": "agg-2026-03-06-provider-model-day",
+  "generated_at": "2026-03-06T18:00:00Z",
+  "window": {
+    "start_at": "2026-03-05T00:00:00Z",
+    "end_at": "2026-03-06T00:00:00Z",
+    "granularity": "day"
+  },
+  "group_by": [
+    "provider",
+    "model"
+  ],
+  "dimensions": {
+    "provider": "openrouter",
+    "model": "anthropic/claude-sonnet-4"
+  },
+  "source": {
+    "attempt_summary_count": 4,
+    "event_count": 28,
+    "used_event_backfill": false,
+    "export_safe": true
+  },
+  "metrics": {
+    "attempts_total": 4,
+    "distinct_ticket_count": 3,
+    "succeeded_count": 3,
+    "failed_count": 1,
+    "blocked_count": 0,
+    "skipped_count": 0,
+    "success_rate": 0.75,
+    "failure_rate": 0.25,
+    "blocked_rate": 0.0,
+    "skipped_rate": 0.0,
+    "retried_attempt_count": 1,
+    "retry_count_total": 2,
+    "tool_call_count_total": 5,
+    "tool_call_count_avg": 1.25,
+    "duration_ms_total": 15400,
+    "duration_ms_avg": 3850.0,
+    "tokens_prompt_total": 4200,
+    "tokens_completion_total": 2100,
+    "total_tokens_total": 6300,
+    "cost_usd_total": 0.78,
+    "cost_usd_avg": 0.195,
+    "error_kind_counts": {
+      "provider": 1,
+      "tool": 0,
+      "validation": 0,
+      "guardrail": 0,
+      "timeout": 0,
+      "internal": 0,
+      "coordination": 0
+    }
+  }
+}

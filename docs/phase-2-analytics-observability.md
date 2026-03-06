@@ -76,7 +76,7 @@ Phase 2 should expose at minimum:
 
 ## Phase 2 Child Ticket Map
 
-- `T-000023`: define analytics metric model and local aggregate storage
+- `T-000023`: define analytics metric model and local aggregate storage in [phase-2-analytics-metric-model.md](phase-2-analytics-metric-model.md) and [../schemas/analytics-aggregate.schema.json](../schemas/analytics-aggregate.schema.json)
 - `T-000024`: implement analytics reporting and operator query surface
 - `T-000025`: add analytics contract and integration coverage
 - `T-000026`: write analytics operator and contributor documentation

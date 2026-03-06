@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "aggregate_id": "agg-2026-03-06-invalid-errors",
+  "generated_at": "2026-03-06T18:00:00Z",
+  "window": {
+    "start_at": "2026-03-05T00:00:00Z",
+    "end_at": "2026-03-06T00:00:00Z",
+    "granularity": "day"
+  },
+  "group_by": [
+    "final_result"
+  ],
+  "dimensions": {
+    "final_result": "failed"
+  },
+  "source": {
+    "attempt_summary_count": 2,
+    "event_count": 6,
+    "used_event_backfill": true,
+    "export_safe": true
+  },
+  "metrics": {
+    "attempts_total": 2,
+    "distinct_ticket_count": 2,
+    "succeeded_count": 0,
+    "failed_count": 2,
+    "blocked_count": 0,
+    "skipped_count": 0,
+    "success_rate": 0.0,
+    "failure_rate": 1.0,
+    "blocked_rate": 0.0,
+    "skipped_rate": 0.0,
+    "retried_attempt_count": 1,
+    "retry_count_total": 1,
+    "tool_call_count_total": 2,
+    "tool_call_count_avg": 1.0,
+    "duration_ms_total": 800,
+    "duration_ms_avg": 400.0,
+    "tokens_prompt_total": 200,
+    "tokens_completion_total": 100,
+    "total_tokens_total": 300,
+    "cost_usd_total": 0.03,
+    "cost_usd_avg": 0.015,
+    "error_kind_counts": {
+      "provider": 1,
+      "tool": 0,
+      "validation": 0,
+      "guardrail": 0,
+      "timeout": 0,
+      "internal": 0
+    }
+  }
+}

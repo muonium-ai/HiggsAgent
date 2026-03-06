@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
+
+import jsonschema
+from referencing import Registry, Resource
+
 from higgs_agent.application import dispatch_next_ready_ticket
 from higgs_agent.testing import load_json_fixture, load_text_fixture
 from higgs_agent.validation import ProposedFileChange
@@ -150,8 +155,41 @@ def test_dispatcher_pipeline_falls_back_from_local_to_hosted_for_auto_route(tmp_
     assert outcome.execution_result.metadata["fallback_triggered"] is True
     assert outcome.execution_result.metadata["fallback_route"]["provider"] == "openrouter"
     assert "retry.scheduled" in [event["event_type"] for event in outcome.execution_result.events]
+    assert [event["sequence"] for event in outcome.execution_result.events] == list(
+        range(len(outcome.execution_result.events))
+    )
+    _validate_event_stream(outcome.execution_result.events)
+    _validate_attempt_summary(outcome.execution_result.attempt_summary)
     assert local_transport.calls
     assert transport.calls
+
+
+def test_dispatcher_pipeline_keeps_explicit_local_failure_observable_without_hosted_fallback(
+    tmp_path: Path,
+) -> None:
+    tickets_dir = _write_ticket_fixture(tmp_path, "tickets/dispatcher_ready_local.md")
+    transport = FakeTransport([])
+    local_transport = FakeLocalTransport([TimeoutError("local runtime unavailable")])
+
+    outcome = dispatch_next_ready_ticket(
+        tickets_dir,
+        transport=transport,
+        local_transport=local_transport,
+        guardrails_path=Path("config/guardrails.example.json"),
+        write_policy_path=Path("config/write-policy.example.json"),
+        planned_changes=(),
+        validation_summary="explicit local execution failed",
+    )
+
+    assert outcome is not None
+    assert outcome.route.provider == "local"
+    assert outcome.execution_result.status == "failed"
+    assert outcome.execution_result.metadata["fallback_triggered"] is False
+    assert outcome.execution_result.attempt_summary["error"]["kind"] == "timeout"
+    _validate_event_stream(outcome.execution_result.events)
+    _validate_attempt_summary(outcome.execution_result.attempt_summary)
+    assert local_transport.calls
+    assert transport.calls == []
 
 
 def _write_ticket_fixture(tmp_path: Path, relative_fixture_path: str) -> Path:
@@ -161,3 +199,32 @@ def _write_ticket_fixture(tmp_path: Path, relative_fixture_path: str) -> Path:
     ticket_id = ticket_content.split("\nid: ", 1)[1].split("\n", 1)[0]
     (tickets_dir / f"{ticket_id}.md").write_text(ticket_content)
     return tickets_dir
+
+
+def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
+    event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
+    common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
+    registry = Registry().with_resource(
+        common_defs["$id"],
+        Resource.from_contents(common_defs),
+    ).with_resource(
+        "common-defs.schema.json",
+        Resource.from_contents(common_defs),
+    )
+    validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
+    for event in events:
+        validator.validate(event)
+
+
+def _validate_attempt_summary(summary: dict[str, object]) -> None:
+    summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
+    common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
+    registry = Registry().with_resource(
+        common_defs["$id"],
+        Resource.from_contents(common_defs),
+    ).with_resource(
+        "common-defs.schema.json",
+        Resource.from_contents(common_defs),
+    )
+    validator = jsonschema.Draft202012Validator(summary_schema, registry=registry)
+    validator.validate(summary)

@@ -36,6 +36,15 @@ class FakeLocalTransport:
         return self.response
 
 
+class RaisingLocalTransport:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def generate(self, prompt: str, system_prompt: str | None, timeout_ms: int) -> dict[str, object]:
+        del prompt, system_prompt, timeout_ms
+        raise self.error
+
+
 def test_hosted_and_local_executors_share_provider_execution_result_shape() -> None:
     hosted_executor = OpenRouterExecutor(
         limits=load_executor_limits(Path("config/guardrails.example.json")),
@@ -87,6 +96,21 @@ def test_local_executor_represents_partial_usage_without_fabricated_cost() -> No
     assert result.usage.has_precise_billing is False
     assert result.attempt_summary["usage"]["total_tokens"] == 50
     assert "cost_usd" not in result.attempt_summary["usage"]
+
+
+def test_local_executor_failure_preserves_schema_compatible_error_shapes() -> None:
+    executor = LocalModelExecutor(
+        limits=load_executor_limits(Path("config/guardrails.example.json")),
+        transport=RaisingLocalTransport(TimeoutError("local runtime stalled")),
+    )
+
+    result = executor.execute(_executor_input(execution_target="local"))
+
+    assert result.status == "failed"
+    assert result.attempt_summary["final_result"] == "failed"
+    assert result.attempt_summary["error"]["kind"] == "timeout"
+    _validate_attempt_summary(result.attempt_summary)
+    _validate_event_stream(result.events)
 
 
 def _executor_input(*, execution_target: str) -> ExecutorInput:

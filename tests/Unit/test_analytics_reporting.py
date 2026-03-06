@@ -200,6 +200,67 @@ def test_cli_report_json_respects_time_window(tmp_path: Path, capsys) -> None:
     assert output[0]["metrics"]["cost_usd_total"] == 0.01
 
 
+def test_aggregate_attempt_summaries_handles_local_partial_usage_without_billing(tmp_path: Path) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+    _write_ticket(
+        tickets_dir / "T-000201.md",
+        ticket_id="T-000201",
+        ticket_type="docs",
+        priority="p1",
+        platform="repo",
+        complexity="low",
+        execution_target="local",
+    )
+
+    attempt_summaries_path = (
+        tmp_path / ".higgs" / "local" / "analytics" / "attempt-summaries.ndjson"
+    )
+    attempt_summaries_path.parent.mkdir(parents=True)
+    attempt_summaries_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "run_id": "run-local-1",
+                "attempt_id": "attempt-local-1",
+                "ticket_id": "T-000201",
+                "started_at": "2026-03-06T12:15:00Z",
+                "ended_at": "2026-03-06T12:15:01Z",
+                "duration_ms": 1000,
+                "final_result": "succeeded",
+                "provider": "local",
+                "model": "local/llama3.1:8b",
+                "tool_call_count": 0,
+                "retry_count": 0,
+                "usage": {
+                    "tokens_prompt": 18,
+                    "tokens_completion": 6,
+                    "total_tokens": 24,
+                    "latency_ms": 1000,
+                },
+            }
+        )
+        + "\n"
+    )
+
+    summaries = load_attempt_summaries(attempt_summaries_path)
+    metadata_index = build_ticket_metadata_index(tickets_dir)
+    report = aggregate_attempt_summaries(
+        summaries,
+        metadata_index,
+        AnalyticsFilter(group_by=("provider", "model", "ticket_type")),
+    )
+
+    schema = json.loads(Path("schemas/analytics-aggregate.schema.json").read_text())
+    assert len(report.records) == 1
+    jsonschema.validate(report.records[0], schema)
+    assert report.records[0]["dimensions"]["provider"] == "local"
+    assert report.records[0]["dimensions"]["model"] == "local/llama3.1:8b"
+    assert report.records[0]["metrics"]["cost_usd_total"] == 0.0
+    assert report.records[0]["metrics"]["total_tokens_total"] == 24
+    assert report.records[0]["source"]["export_safe"] is True
+
+
 def _write_ticket(
     path: Path,
     *,
@@ -208,6 +269,7 @@ def _write_ticket(
     priority: str,
     platform: str,
     complexity: str,
+    execution_target: str = "hosted",
 ) -> None:
     path.write_text(
         "---\n"
@@ -219,7 +281,7 @@ def _write_ticket(
         "higgs_schema_version: 1\n"
         f"higgs_platform: {platform}\n"
         f"higgs_complexity: {complexity}\n"
-        "higgs_execution_target: hosted\n"
+        f"higgs_execution_target: {execution_target}\n"
         "higgs_tool_profile: standard\n"
         "---\n\n"
         "Body\n"

@@ -194,7 +194,7 @@ def _execute_hosted_fallback(
     fallback_attempt_summary = dict(fallback_result.attempt_summary)
     fallback_attempt_summary["retry_count"] = primary_result.retry_count + fallback_result.retry_count + 1
 
-    combined_events = (
+    combined_events = _resequenced_events(
         primary_result.events
         + (
             _dispatcher_event(
@@ -243,6 +243,15 @@ def _execute_hosted_fallback(
         retry_count=primary_result.retry_count + fallback_result.retry_count + 1,
         metadata={**fallback_result.metadata, **fallback_metadata},
     )
+
+
+def _resequenced_events(events: tuple[dict[str, object], ...]) -> tuple[dict[str, object], ...]:
+    normalized_events: list[dict[str, object]] = []
+    for index, event in enumerate(events):
+        normalized_event = dict(event)
+        normalized_event["sequence"] = index
+        normalized_events.append(normalized_event)
+    return tuple(normalized_events)
 
 
 def _route_metadata(route: RouteDecision) -> dict[str, object]:

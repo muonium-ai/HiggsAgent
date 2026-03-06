@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "event_id": "evt-2",
+  "event_type": "execution.created",
+  "occurred_at": "2026-03-06T00:00:00Z",
+  "sequence": 0,
+  "run_id": "run-1",
+  "attempt_id": "attempt-1",
+  "ticket_id": "T-900001",
+  "payload": {
+    "trigger": "ticket-claim"
+  }
+}

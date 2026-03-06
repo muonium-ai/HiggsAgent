@@ -87,6 +87,7 @@ Phase 1 may rely only on approved Phase 0 contracts:
 - Input: executor output, proposed repository mutations, and write policy
 - Output: one of `accepted`, `handoff_required`, or `rejected`
 - Must separate validation logic from provider execution so the write gate is independently testable
+- Handoff decisions must include enough structured context for a human reviewer to understand changed paths, validation summary, guardrail usage, and the blocking reason without reading raw provider payloads
 
 ### 6. Event Boundary
 

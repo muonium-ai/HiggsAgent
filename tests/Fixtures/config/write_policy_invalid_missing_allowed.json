@@ -1,0 +1,15 @@
+{
+  "protected_paths": [
+    "tickets/**"
+  ],
+  "limits": {
+    "max_changed_files": 20,
+    "max_net_line_delta": 800,
+    "allow_binary_writes": false
+  },
+  "handoff": {
+    "require_human_review_on_protected_path": true,
+    "require_human_review_on_secret_suspect": true,
+    "require_human_review_on_policy_violation": true
+  }
+}

@@ -64,6 +64,7 @@ Phase 1 may rely only on approved Phase 0 contracts:
 - Output: normalized dispatch semantics
 - Must use only approved Higgs and MuonTickets fields
 - Must produce explicit failures or warnings for unsupported values and missing required inputs
+- Output shape must include `type`, `priority`, `platform`, `complexity`, `execution_target`, and `tool_profile` in normalized form
 
 ### 3. Routing Boundary
 

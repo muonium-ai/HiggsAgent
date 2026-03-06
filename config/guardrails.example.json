@@ -1,0 +1,23 @@
+{
+  "limits": {
+    "max_prompt_tokens": 16000,
+    "max_completion_tokens": 8000,
+    "max_total_tokens": 24000,
+    "max_cost_usd": 5.0,
+    "max_tool_calls": 8,
+    "provider_timeout_ms": 120000,
+    "ticket_timeout_ms": 900000,
+    "max_attempts": 3
+  },
+  "artifacts": {
+    "commit_raw_prompts": false,
+    "commit_raw_responses": false,
+    "retain_local_days": 14,
+    "retain_summary_days": 90
+  },
+  "execution": {
+    "default_write_mode": "review",
+    "allow_autonomous_commit": false,
+    "allow_direct_push": false
+  }
+}

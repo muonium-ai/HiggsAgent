@@ -1,0 +1,9 @@
+# Shared control-plane files require explicit review ownership.
+
+* @senthil
+
+/config/** @senthil
+/schemas/** @senthil
+/.github/** @senthil
+/composer.json @senthil
+/Makefile @senthil

@@ -72,7 +72,7 @@ The following scenarios remain unsupported or intentionally deferred in this pha
 
 - automatic discovery or installation of a local runtime
 - hosted-to-local fallback
-- adaptive scoring between hosted and local routes
+- adaptive scoring in the live dispatcher path
 - tool-enabled explicit local execution
 - production packaging guidance for local inference stacks
 - platform-specific operator guidance beyond macOS and Linux

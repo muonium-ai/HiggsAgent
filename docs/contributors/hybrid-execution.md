@@ -70,6 +70,7 @@ Run broader validation when the change touches shared schemas, CLI behavior, or 
 Require tighter review when a change:
 
 - alters deterministic selection rules for `auto` or `local`
+- wires adaptive scoring into the live dispatcher path or fallback selection flow
 - changes fallback direction or broadens fallback eligibility
 - changes the meaning of local partial-usage reporting
 - changes operator claims around supported local environments

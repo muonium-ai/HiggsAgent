@@ -32,6 +32,7 @@ The repository is currently in Phase 0 foundation work. The dispatcher runtime i
 
 - [docs/architecture.md](docs/architecture.md)
 - [docs/runtime-tooling.md](docs/runtime-tooling.md)
+- [docs/repository-structure.md](docs/repository-structure.md)
 - [docs/todo.md](docs/todo.md)
 
 ## Ticket Workflow

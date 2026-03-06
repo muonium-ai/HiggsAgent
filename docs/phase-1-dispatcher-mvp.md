@@ -80,6 +80,7 @@ Phase 1 may rely only on approved Phase 0 contracts:
 - Output: structured provider response plus execution metadata
 - Must capture timing, token, cost, retry, and tool-call data needed by the observability schemas
 - Must keep provider-specific behavior behind the hosted adapter boundary
+- Tool-call handling must stay explicit: disabled tools hard-fail, tool-call counts are budgeted, and provider-emitted tool requests are surfaced as first-class event records
 
 ### 5. Validation Boundary
 

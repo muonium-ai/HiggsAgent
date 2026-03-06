@@ -1,0 +1,8 @@
+{
+  "limits": {
+    "max_cost_usd": 5.0,
+    "max_tool_calls": 1,
+    "provider_timeout_ms": 120000,
+    "max_attempts": 3
+  }
+}

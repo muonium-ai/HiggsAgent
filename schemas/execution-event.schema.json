@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muonium.ai/schemas/execution-event.schema.json",
+  "title": "Higgs Execution Event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "sequence",
+    "run_id",
+    "attempt_id",
+    "ticket_id",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "execution.created",
+        "ticket.eligibility_evaluated",
+        "classification.completed",
+        "route.selected",
+        "guardrails.checked",
+        "provider.requested",
+        "tool.call.started",
+        "tool.call.completed",
+        "provider.responded",
+        "validation.completed",
+        "write_gate.decided",
+        "artifact.recorded",
+        "retry.scheduled",
+        "execution.completed"
+      ]
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "attempt_id": {
+      "type": "string"
+    },
+    "ticket_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "started",
+        "succeeded",
+        "failed",
+        "blocked",
+        "skipped",
+        "retry_scheduled",
+        "completed"
+      ]
+    },
+    "executor_version": {
+      "type": "string"
+    },
+    "repo_head": {
+      "type": "string"
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "common-defs.schema.json#/$defs/artifactRef"
+      }
+    },
+    "usage": {
+      "$ref": "common-defs.schema.json#/$defs/usage"
+    },
+    "limits": {
+      "$ref": "common-defs.schema.json#/$defs/budgetLimits"
+    },
+    "error": {
+      "$ref": "common-defs.schema.json#/$defs/errorInfo"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

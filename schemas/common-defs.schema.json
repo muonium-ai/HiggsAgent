@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muonium.ai/schemas/common-defs.schema.json",
+  "title": "Higgs Common Schema Definitions",
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "required": [
+        "path",
+        "scope"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "local",
+            "committed",
+            "external"
+          ]
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "tokens_prompt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens_completion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "errorInfo": {
+      "type": "object",
+      "required": [
+        "kind",
+        "message"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "tool",
+            "validation",
+            "guardrail",
+            "timeout",
+            "internal",
+            "coordination"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "budgetLimits": {
+      "type": "object",
+      "properties": {
+        "max_prompt_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_completion_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_total_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_cost_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -12,6 +12,7 @@ This guide routes operators to runtime, guardrail, observability, and artifact-h
 
 - [runbook.md](runbook.md)
 - [guardrails-and-artifacts.md](guardrails-and-artifacts.md)
+- [analytics.md](analytics.md)
 - [../safety-model.md](../safety-model.md)
 
 ## Normative Sources

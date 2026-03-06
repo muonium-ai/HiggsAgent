@@ -21,6 +21,12 @@ Summarize the safe operating model before the full runtime exists.
 - [../review-handoff-template.md](../review-handoff-template.md)
 - [../observability-contract.md](../observability-contract.md)
 
+## Analytics Notes
+
+- Generate analytics reports from local normalized attempt summaries, not raw provider payloads.
+- Treat any aggregate output with `source.export_safe=false` as review-only.
+- Use [analytics.md](analytics.md) for report commands, sharing boundaries, and retention expectations.
+
 ## Update When
 
 - review triggers change

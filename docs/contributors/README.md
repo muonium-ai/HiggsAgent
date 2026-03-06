@@ -12,6 +12,7 @@ This guide routes contributors to setup, development workflow, and the contracts
 
 - [setup.md](setup.md)
 - [workflow.md](workflow.md)
+- [analytics.md](analytics.md)
 - [../runtime-tooling.md](../runtime-tooling.md)
 - [../repository-structure.md](../repository-structure.md)
 

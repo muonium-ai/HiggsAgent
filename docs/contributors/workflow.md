@@ -31,6 +31,12 @@ make tickets-validate
 - [../safety-model.md](../safety-model.md)
 - [../documentation-policy.md](../documentation-policy.md)
 
+## Analytics Changes
+
+- Keep analytics schema, implementation, tests, and docs aligned in the same change when metrics or report behavior move.
+- Treat `schemas/analytics-aggregate.schema.json` and `src/higgs_agent/analytics/` as shared contract surfaces.
+- Update contributor and operator analytics guides when storage paths, sharing rules, or report commands change.
+
 ## Update When
 
 - validation requirements change

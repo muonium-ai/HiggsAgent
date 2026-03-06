@@ -38,7 +38,7 @@ This document defines the initial architecture direction used to create the back
 
 ### Runtime and Tooling
 
-The working runtime contract is now Python managed with `uv`. Earlier PHP references in the initial PRD are superseded by this repository decision. The foundation phase must define:
+The working runtime contract is Python managed with `uv`. The foundation phase must define:
 
 - how the Python runtime is installed and invoked
 - how `uv` manages the project environment, dependency graph, and execution entrypoints

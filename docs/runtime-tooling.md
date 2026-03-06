@@ -21,12 +21,12 @@ This document defines the supported runtime and tooling model for HiggsAgent dur
 
 ## Why This Split Exists
 
-The repository contract is that HiggsAgent itself is implemented in Python and managed with `uv`. The earlier PHP assumption is superseded by this decision.
+The repository contract is that HiggsAgent itself is implemented in Python and managed with `uv`.
 
 This avoids three common problems:
 
 1. Splitting product logic across two runtime stacks before the first implementation exists.
-2. Requiring contributors to guess whether Composer or `uv` is the authoritative environment manager.
+2. Requiring contributors to guess which tool is the authoritative environment manager.
 3. Making later ports depend on an unnecessary transitional runtime.
 
 ## Supported Contributor Surface

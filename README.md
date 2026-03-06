@@ -36,6 +36,7 @@ The repository is currently in Phase 0 foundation work. The dispatcher runtime i
 
 ## Repository Guides
 
+- [docs/README.md](docs/README.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/runtime-tooling.md](docs/runtime-tooling.md)
 - [docs/repository-structure.md](docs/repository-structure.md)

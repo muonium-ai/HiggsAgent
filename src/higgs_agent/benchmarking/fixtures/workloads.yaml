@@ -1,0 +1,80 @@
+schema_version: 1
+workloads:
+  - id: docs-release-notes-summary
+    title: Release Notes Summary
+    description: Summarize a sanitized release-notes style input into concise operator-facing documentation.
+    task: |
+      Summarize the provided release notes into a concise operator update with preserved facts,
+      a clear structure, and no invented changes.
+    ticket_shape:
+      work_type: docs
+      priority: p2
+      platform: agnostic
+      complexity: low
+      execution_target: auto
+      tool_profile: none
+      labels:
+        - benchmark
+        - docs
+      tags:
+        - low-risk
+        - toolless
+    success_criteria:
+      - Preserves the explicitly stated facts from the source text.
+      - Produces concise operator-facing prose without invented features.
+    tags:
+      - docs
+      - summary
+    requires_repository_write: false
+  - id: spec-routing-tradeoff-analysis
+    title: Routing Tradeoff Analysis
+    description: Analyze a normalized architecture change request and produce a structured spec recommendation.
+    task: |
+      Review a sanitized architecture change request and produce a short recommendation that
+      compares options, identifies tradeoffs, and keeps the decision rationale explicit.
+    ticket_shape:
+      work_type: spec
+      priority: p1
+      platform: repo
+      complexity: medium
+      execution_target: hosted
+      tool_profile: standard
+      labels:
+        - benchmark
+        - spec
+      tags:
+        - analysis
+        - structured-output
+    success_criteria:
+      - Identifies at least two options or tradeoffs explicitly.
+      - Keeps the recommendation grounded in the provided constraints.
+    tags:
+      - spec
+      - analysis
+    requires_repository_write: false
+  - id: tests-failure-triage-plan
+    title: Failure Triage Plan
+    description: Produce a deterministic investigation plan for a sanitized failing-test scenario.
+    task: |
+      Given a sanitized failing-test scenario, produce a triage plan that orders likely causes,
+      proposes bounded checks, and avoids claiming root cause without evidence.
+    ticket_shape:
+      work_type: tests
+      priority: p1
+      platform: cross_platform
+      complexity: high
+      execution_target: hosted
+      tool_profile: extended
+      labels:
+        - benchmark
+        - tests
+      tags:
+        - triage
+        - high-complexity
+    success_criteria:
+      - Orders the investigation steps from highest to lowest diagnostic value.
+      - Avoids unsupported root-cause claims and keeps proposed checks bounded.
+    tags:
+      - tests
+      - triage
+    requires_repository_write: false

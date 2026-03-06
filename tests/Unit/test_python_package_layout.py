@@ -15,6 +15,7 @@ def test_expected_package_directories_exist() -> None:
         "application",
         "adaptive",
         "analytics",
+        "benchmarking",
         "tickets",
         "routing",
         "providers",

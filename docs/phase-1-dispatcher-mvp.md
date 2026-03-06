@@ -4,6 +4,8 @@
 
 This document defines the implementation contract for the first dispatcher milestone. It bounds what Phase 1 must deliver, what it must leave out, and how the downstream scanner, classifier, routing, executor, validation, test, and documentation tickets fit together.
 
+For operator-facing and contributor-facing usage guidance built on top of this contract, see [operators/dispatcher.md](operators/dispatcher.md) and [contributors/dispatcher.md](contributors/dispatcher.md).
+
 ## Goal
 
 Phase 1 delivers the first end-to-end deterministic dispatch pipeline for HiggsAgent:

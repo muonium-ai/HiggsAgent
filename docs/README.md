@@ -32,3 +32,6 @@ These documents are the source of truth when guidance and implementation disagre
 ## Audience Guides
 
 Audience guides summarize the contracts for specific readers. They do not override the contract documents above.
+
+- Operators: [operators/README.md](operators/README.md)
+- Contributors: [contributors/README.md](contributors/README.md)

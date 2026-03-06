@@ -12,6 +12,7 @@ This guide routes contributors to setup, development workflow, and the contracts
 
 - [setup.md](setup.md)
 - [workflow.md](workflow.md)
+- [dispatcher.md](dispatcher.md)
 - [analytics.md](analytics.md)
 - [hybrid-execution.md](hybrid-execution.md)
 - [../runtime-tooling.md](../runtime-tooling.md)
@@ -29,3 +30,4 @@ This guide routes contributors to setup, development workflow, and the contracts
 - local validation commands change
 - repository package boundaries move
 - hosted versus local execution behavior changes
+- dispatcher orchestration or public usage guidance changes

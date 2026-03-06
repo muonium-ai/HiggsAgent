@@ -11,6 +11,7 @@ This guide routes operators to runtime, guardrail, observability, and artifact-h
 ## Read Next
 
 - [runbook.md](runbook.md)
+- [dispatcher.md](dispatcher.md)
 - [guardrails-and-artifacts.md](guardrails-and-artifacts.md)
 - [analytics.md](analytics.md)
 - [hybrid-execution.md](hybrid-execution.md)
@@ -28,3 +29,4 @@ This guide routes operators to runtime, guardrail, observability, and artifact-h
 - guardrail defaults change
 - retention or redaction rules change
 - hosted versus local execution behavior changes
+- dispatcher execution or review workflow changes

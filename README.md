@@ -39,6 +39,7 @@ The repository is currently through Phase 3 hybrid execution foundations. The di
 
 - [docs/README.md](docs/README.md)
 - [docs/architecture.md](docs/architecture.md)
+- [docs/phase-1-dispatcher-mvp.md](docs/phase-1-dispatcher-mvp.md)
 - [docs/runtime-tooling.md](docs/runtime-tooling.md)
 - [docs/repository-structure.md](docs/repository-structure.md)
 - [docs/todo.md](docs/todo.md)

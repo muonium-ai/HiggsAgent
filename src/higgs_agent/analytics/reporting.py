@@ -22,6 +22,28 @@ GROUP_DIMENSIONS = {
     "error_kind",
 }
 
+SENSITIVE_FIELD_NAMES = {
+    "api_key",
+    "authorization",
+    "bearer_token",
+    "cookie",
+    "env",
+    "headers",
+    "private_key",
+    "prompt",
+    "provider_headers",
+    "provider_payload",
+    "raw_prompt",
+    "raw_response",
+    "response",
+    "secret",
+    "stderr",
+    "stdout",
+    "token",
+    "tool_stderr",
+    "tool_stdout",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class AnalyticsFilter:
@@ -205,6 +227,7 @@ def _enrich_summary(
         "tokens_completion": _int_or_zero(usage.get("tokens_completion")),
         "total_tokens": _int_or_zero(usage.get("total_tokens")),
         "cost_usd": _float_or_zero(usage.get("cost_usd")),
+        "contains_sensitive_data": _contains_sensitive_analytics_input(summary),
     }
 
 
@@ -253,6 +276,7 @@ def _build_aggregate_record(
     tokens_completion_total = sum(int(row["tokens_completion"]) for row in rows)
     total_tokens_total = sum(int(row["total_tokens"]) for row in rows)
     cost_usd_total = sum(float(row["cost_usd"]) for row in rows)
+    export_safe = not any(bool(row["contains_sensitive_data"]) for row in rows)
 
     dimensions = {key: value for key, value in group_key}
     started_at_values = [
@@ -278,7 +302,7 @@ def _build_aggregate_record(
             "attempt_summary_count": attempts_total,
             "event_count": 0,
             "used_event_backfill": False,
-            "export_safe": True,
+            "export_safe": export_safe,
         },
         "metrics": {
             "attempts_total": attempts_total,
@@ -368,3 +392,28 @@ def _dimension_keys(value: object) -> tuple[str, ...]:
     if not isinstance(value, Mapping):
         return ()
     return tuple(str(key) for key in value.keys())
+
+
+def _contains_sensitive_analytics_input(value: object, *, field_name: str | None = None) -> bool:
+    if field_name is not None and field_name.lower() in SENSITIVE_FIELD_NAMES:
+        return True
+
+    if isinstance(value, Mapping):
+        for key, nested_value in value.items():
+            if _contains_sensitive_analytics_input(nested_value, field_name=str(key)):
+                return True
+        return False
+
+    if isinstance(value, list):
+        return any(_contains_sensitive_analytics_input(item) for item in value)
+
+    if isinstance(value, str):
+        lowered = value.lower()
+        return (
+            "sk-" in lowered
+            or "bearer " in lowered
+            or "-----begin" in lowered
+            or "authorization:" in lowered
+        )
+
+    return False

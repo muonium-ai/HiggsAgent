@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "aggregate_id": "agg-2026-03-06-invalid-missing-metric",
+  "generated_at": "2026-03-06T18:00:00Z",
+  "window": {
+    "start_at": "2026-03-05T00:00:00Z",
+    "end_at": "2026-03-06T00:00:00Z",
+    "granularity": "day"
+  },
+  "group_by": [
+    "provider"
+  ],
+  "dimensions": {
+    "provider": "openrouter"
+  },
+  "source": {
+    "attempt_summary_count": 1,
+    "event_count": 0,
+    "used_event_backfill": false,
+    "export_safe": true
+  },
+  "metrics": {
+    "attempts_total": 1,
+    "distinct_ticket_count": 1,
+    "succeeded_count": 1,
+    "failed_count": 0,
+    "blocked_count": 0,
+    "skipped_count": 0,
+    "success_rate": 1.0,
+    "failure_rate": 0.0,
+    "blocked_rate": 0.0,
+    "skipped_rate": 0.0,
+    "retried_attempt_count": 0,
+    "retry_count_total": 0,
+    "tool_call_count_total": 0,
+    "tool_call_count_avg": 0.0,
+    "duration_ms_total": 10,
+    "duration_ms_avg": 10.0,
+    "tokens_prompt_total": 0,
+    "tokens_completion_total": 0,
+    "total_tokens_total": 0,
+    "cost_usd_total": 0.0,
+    "error_kind_counts": {
+      "provider": 0,
+      "tool": 0,
+      "validation": 0,
+      "guardrail": 0,
+      "timeout": 0,
+      "internal": 0,
+      "coordination": 0
+    }
+  }
+}

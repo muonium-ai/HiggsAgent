@@ -10,6 +10,7 @@ Explain what a host repository must provide and what contracts HiggsAgent expect
 
 ## Read Next
 
+- [new-project-quickstart.md](new-project-quickstart.md)
 - [integration-overview.md](integration-overview.md)
 - [benchmarking.md](benchmarking.md)
 - [repository-requirements.md](repository-requirements.md)

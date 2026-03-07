@@ -32,13 +32,15 @@ The repository is currently through Phase 5 benchmarking foundations. The runtim
 	```
 
 4. Review the runtime contract in [docs/runtime-tooling.md](docs/runtime-tooling.md).
-5. Review the benchmark methodology contract in [docs/phase-5-benchmarking-mode.md](docs/phase-5-benchmarking-mode.md) and the operator, contributor, and adopter guides under [docs/operators](docs/operators), [docs/contributors](docs/contributors), and [docs/adopters](docs/adopters).
-6. Use `make help` for the documented task surface.
+5. If you want to use HiggsAgent patterns in a fresh repository, start with [docs/adopters/new-project-quickstart.md](docs/adopters/new-project-quickstart.md).
+6. Review the benchmark methodology contract in [docs/phase-5-benchmarking-mode.md](docs/phase-5-benchmarking-mode.md) and the operator, contributor, and adopter guides under [docs/operators](docs/operators), [docs/contributors](docs/contributors), and [docs/adopters](docs/adopters).
+7. Use `make help` for the documented task surface.
 
 ## Repository Guides
 
 - [docs/README.md](docs/README.md)
 - [docs/architecture.md](docs/architecture.md)
+- [docs/adopters/new-project-quickstart.md](docs/adopters/new-project-quickstart.md)
 - [docs/phase-1-dispatcher-mvp.md](docs/phase-1-dispatcher-mvp.md)
 - [docs/runtime-tooling.md](docs/runtime-tooling.md)
 - [docs/repository-structure.md](docs/repository-structure.md)

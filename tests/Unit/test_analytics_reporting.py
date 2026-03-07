@@ -336,6 +336,37 @@ def test_bounded_aggregation_excludes_rows_with_missing_or_unusable_timestamps(t
     assert report.records[0]["metrics"]["cost_usd_total"] == 0.01
 
 
+def test_build_ticket_metadata_index_skips_malformed_ticket_files(tmp_path: Path) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+    archive_dir = tickets_dir / "archive"
+    archive_dir.mkdir()
+    _write_ticket(
+        tickets_dir / "T-000230.md",
+        ticket_id="T-000230",
+        ticket_type="code",
+        priority="p0",
+        platform="repo",
+        complexity="high",
+    )
+    _write_ticket(
+        archive_dir / "T-000231.md",
+        ticket_id="T-000231",
+        ticket_type="docs",
+        priority="p2",
+        platform="web",
+        complexity="low",
+    )
+    (tickets_dir / "T-000232.md").write_text("not-frontmatter\n")
+    (archive_dir / "T-000233.md").write_text("---\nid: T-000233\nstatus: done\ndepends_on: nope\n---\n")
+
+    metadata_index = build_ticket_metadata_index(tickets_dir)
+
+    assert set(metadata_index) == {"T-000230", "T-000231"}
+    assert metadata_index["T-000230"]["ticket_priority"] == "p0"
+    assert metadata_index["T-000231"]["ticket_type"] == "docs"
+
+
 def test_cli_report_fails_for_missing_attempt_summaries_file(tmp_path: Path) -> None:
     tickets_dir = tmp_path / "tickets"
     tickets_dir.mkdir()
@@ -493,7 +524,7 @@ def test_cli_report_fails_for_malformed_attempt_summary_json(tmp_path: Path) -> 
         )
 
 
-def test_cli_report_fails_for_malformed_ticket_metadata(tmp_path: Path) -> None:
+def test_cli_report_ignores_malformed_ticket_metadata_files(tmp_path: Path, capsys) -> None:
     tickets_dir = tmp_path / "tickets"
     tickets_dir.mkdir()
     (tickets_dir / "T-000999.md").write_text("not-frontmatter\n")
@@ -516,17 +547,23 @@ def test_cli_report_fails_for_malformed_ticket_metadata(tmp_path: Path) -> None:
         + "\n"
     )
 
-    with pytest.raises(SystemExit, match=r"analytics report failed: .*missing YAML frontmatter"):
-        main(
-            [
-                "analytics",
-                "report",
-                "--attempt-summaries",
-                str(attempt_summaries_path),
-                "--tickets-dir",
-                str(tickets_dir),
-            ]
-        )
+    main(
+        [
+            "analytics",
+            "report",
+            "--attempt-summaries",
+            str(attempt_summaries_path),
+            "--tickets-dir",
+            str(tickets_dir),
+            "--format",
+            "json",
+        ]
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert len(output) == 1
+    assert output[0]["metrics"]["attempts_total"] == 1
+    assert output[0]["dimensions"] == {}
 
 
 def _write_ticket(

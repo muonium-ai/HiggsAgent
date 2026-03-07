@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from higgs_agent.routing import ClassificationInputError, classify_ticket
-from higgs_agent.tickets import TicketRecord
+from higgs_agent.tickets import TicketParseError, TicketRecord
 
 GROUP_DIMENSIONS = {
     "provider",
@@ -98,7 +98,10 @@ def build_ticket_metadata_index(tickets_dir: Path) -> dict[str, dict[str, str]]:
 
     metadata_index: dict[str, dict[str, str]] = {}
     for path in ticket_paths:
-        record = TicketRecord.from_path(path)
+        try:
+            record = TicketRecord.from_path(path)
+        except TicketParseError:
+            continue
         frontmatter = record.frontmatter
         metadata = {
             "ticket_type": _optional_string(frontmatter.get("type")),

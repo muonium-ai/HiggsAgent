@@ -4,7 +4,7 @@ HiggsAgent is a Git-native autonomous agent dispatcher that routes work based on
 
 ## Status
 
-The repository is currently through Phase 4 adaptive dispatch foundations. The runtime now includes deterministic hosted and local route selection, bounded fallback behavior, normalized observability, analytics reporting, adaptive telemetry ingestion, explainable adaptive scoring surfaces, and write-gate validation.
+The repository is currently through Phase 5 benchmarking foundations. The runtime now includes deterministic hosted and local route selection, bounded fallback behavior, normalized observability, analytics reporting, adaptive telemetry ingestion, explainable adaptive scoring surfaces, curated benchmark workloads, comparable benchmark execution, benchmark ranking outputs, and write-gate validation.
 
 ## Runtime Model
 
@@ -32,7 +32,7 @@ The repository is currently through Phase 4 adaptive dispatch foundations. The r
 	```
 
 4. Review the runtime contract in [docs/runtime-tooling.md](docs/runtime-tooling.md).
-5. Review the hybrid execution contract in [docs/phase-3-hybrid-execution.md](docs/phase-3-hybrid-execution.md) and the operator and contributor guides under [docs/operators](docs/operators) and [docs/contributors](docs/contributors).
+5. Review the benchmark methodology contract in [docs/phase-5-benchmarking-mode.md](docs/phase-5-benchmarking-mode.md) and the operator, contributor, and adopter guides under [docs/operators](docs/operators), [docs/contributors](docs/contributors), and [docs/adopters](docs/adopters).
 6. Use `make help` for the documented task surface.
 
 ## Repository Guides

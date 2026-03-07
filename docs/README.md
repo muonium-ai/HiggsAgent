@@ -37,3 +37,4 @@ Audience guides summarize the contracts for specific readers. They do not overri
 
 - Operators: [operators/README.md](operators/README.md)
 - Contributors: [contributors/README.md](contributors/README.md)
+- Adopters: [adopters/README.md](adopters/README.md)

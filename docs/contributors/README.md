@@ -14,6 +14,7 @@ This guide routes contributors to setup, development workflow, and the contracts
 - [workflow.md](workflow.md)
 - [dispatcher.md](dispatcher.md)
 - [adaptive-dispatch.md](adaptive-dispatch.md)
+- [benchmarking.md](benchmarking.md)
 - [analytics.md](analytics.md)
 - [hybrid-execution.md](hybrid-execution.md)
 - [../runtime-tooling.md](../runtime-tooling.md)
@@ -32,4 +33,5 @@ This guide routes contributors to setup, development workflow, and the contracts
 - repository package boundaries move
 - hosted versus local execution behavior changes
 - adaptive telemetry, scoring, or observability behavior changes
+- benchmark workload, harness, reporting, or methodology behavior changes
 - dispatcher orchestration or public usage guidance changes

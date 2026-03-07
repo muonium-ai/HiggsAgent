@@ -13,6 +13,7 @@ This guide routes operators to runtime, guardrail, observability, and artifact-h
 - [runbook.md](runbook.md)
 - [dispatcher.md](dispatcher.md)
 - [adaptive-dispatch.md](adaptive-dispatch.md)
+- [benchmarking.md](benchmarking.md)
 - [guardrails-and-artifacts.md](guardrails-and-artifacts.md)
 - [analytics.md](analytics.md)
 - [hybrid-execution.md](hybrid-execution.md)
@@ -31,4 +32,5 @@ This guide routes operators to runtime, guardrail, observability, and artifact-h
 - retention or redaction rules change
 - hosted versus local execution behavior changes
 - adaptive scoring behavior, review expectations, or rollout guidance changes
+- benchmarking methodology, interpretation limits, or public review expectations change
 - dispatcher execution or review workflow changes

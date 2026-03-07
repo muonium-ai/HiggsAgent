@@ -15,6 +15,10 @@ class RouteGuardrails:
 
     max_cost_usd: float
     max_tool_calls: int
+    economy_route: RouteProfile
+    balanced_route: RouteProfile
+    deep_route: RouteProfile
+    local_route: RouteProfile
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,7 +102,18 @@ def load_route_guardrails(config_path: Path) -> RouteGuardrails:
     if not isinstance(max_tool_calls, int):
         raise RoutingInputError("guardrail config missing integer 'max_tool_calls'")
 
-    return RouteGuardrails(max_cost_usd=float(max_cost_usd), max_tool_calls=max_tool_calls)
+    routing_payload = payload.get("routing")
+    if routing_payload is not None and not isinstance(routing_payload, dict):
+        raise RoutingInputError("guardrail config 'routing' must be an object")
+
+    return RouteGuardrails(
+        max_cost_usd=float(max_cost_usd),
+        max_tool_calls=max_tool_calls,
+        economy_route=_load_route_profile(routing_payload, "economy", MINI_ROUTE),
+        balanced_route=_load_route_profile(routing_payload, "balanced", BALANCED_ROUTE),
+        deep_route=_load_route_profile(routing_payload, "deep", DEEP_ROUTE),
+        local_route=_load_route_profile(routing_payload, "local", LOCAL_ROUTE),
+    )
 
 
 def choose_route(
@@ -128,13 +143,13 @@ def choose_route(
             rationale.append("blocked:local_route_requires_toolless_request")
             return _blocked_route(semantics, rationale, "local_execution_requires_toolless_route")
         rationale.append("hybrid_policy:explicit_local_route")
-        return _selected_route(semantics, LOCAL_ROUTE, rationale)
+        return _selected_route(semantics, guardrails.local_route, rationale)
 
     if semantics.execution_target == "auto" and local_execution_enabled:
         auto_local_rationale = _auto_local_rationale(semantics)
         rationale.extend(auto_local_rationale)
         if auto_local_rationale[-1] == "hybrid_policy:auto_prefers_local":
-            return _selected_route(semantics, LOCAL_ROUTE, rationale)
+            return _selected_route(semantics, guardrails.local_route, rationale)
     elif semantics.execution_target == "auto":
         rationale.append("hybrid_policy:auto_hosted_local_unavailable")
     else:
@@ -148,7 +163,7 @@ def _choose_hosted_route(
     guardrails: RouteGuardrails,
     rationale: list[str],
 ) -> RouteDecision:
-    candidates = _candidate_routes(semantics, rationale)
+    candidates = _candidate_routes(semantics, guardrails, rationale)
     candidates = _filter_tool_profile(candidates, semantics, rationale)
 
     affordable = [
@@ -215,23 +230,25 @@ def _blocked_route(
 
 
 def _candidate_routes(
-    semantics: NormalizedTicketSemantics, rationale: list[str]
+    semantics: NormalizedTicketSemantics,
+    guardrails: RouteGuardrails,
+    rationale: list[str],
 ) -> list[RouteProfile]:
     if semantics.platform in {"ios", "macos"}:
         rationale.append("platform_bias:openai_platform_sensitive")
-        candidates = [BALANCED_ROUTE, DEEP_ROUTE, MINI_ROUTE]
+        candidates = [guardrails.balanced_route, guardrails.deep_route, guardrails.economy_route]
     elif semantics.work_type in {"code", "refactor"}:
         rationale.append("work_type_bias:deep_code_route")
-        candidates = [DEEP_ROUTE, BALANCED_ROUTE, MINI_ROUTE]
+        candidates = [guardrails.deep_route, guardrails.balanced_route, guardrails.economy_route]
     elif semantics.work_type in {"spec", "tests"}:
         rationale.append("work_type_bias:balanced_analysis_route")
-        candidates = [BALANCED_ROUTE, DEEP_ROUTE, MINI_ROUTE]
+        candidates = [guardrails.balanced_route, guardrails.deep_route, guardrails.economy_route]
     elif semantics.work_type in {"docs", "chore"}:
         rationale.append("work_type_bias:economy_docs_route")
-        candidates = [MINI_ROUTE, BALANCED_ROUTE, DEEP_ROUTE]
+        candidates = [guardrails.economy_route, guardrails.balanced_route, guardrails.deep_route]
     else:
         rationale.append("work_type_bias:default_balanced_route")
-        candidates = [BALANCED_ROUTE, MINI_ROUTE, DEEP_ROUTE]
+        candidates = [guardrails.balanced_route, guardrails.economy_route, guardrails.deep_route]
 
     if semantics.complexity == "high":
         rationale.append("complexity_bias:prefer_higher_capability")
@@ -258,7 +275,43 @@ def _filter_tool_profile(
 
 
 def _promote_route_depth(candidates: list[RouteProfile]) -> list[RouteProfile]:
-    if DEEP_ROUTE in candidates:
-        remaining = [route for route in candidates if route is not DEEP_ROUTE]
-        return [DEEP_ROUTE, *remaining]
-    return candidates
+    deepest_route = max(candidates, key=lambda route: route.estimated_cost_usd, default=None)
+    if deepest_route is None:
+        return []
+    remaining = [route for route in candidates if route is not deepest_route]
+    return [deepest_route, *remaining]
+
+
+def _load_route_profile(
+    routing_payload: dict[str, object] | None,
+    profile_name: str,
+    default_profile: RouteProfile,
+) -> RouteProfile:
+    if routing_payload is None:
+        return default_profile
+
+    profile_payload = routing_payload.get(profile_name)
+    if profile_payload is None:
+        return default_profile
+    if not isinstance(profile_payload, dict):
+        raise RoutingInputError(f"guardrail config routing.{profile_name} must be an object")
+
+    provider = profile_payload.get("provider", default_profile.provider)
+    model_id = profile_payload.get("model_id", default_profile.model_id)
+    estimated_cost_usd = profile_payload.get("estimated_cost_usd", default_profile.estimated_cost_usd)
+
+    if not isinstance(provider, str) or not provider.strip():
+        raise RoutingInputError(f"guardrail config routing.{profile_name}.provider must be a non-empty string")
+    if not isinstance(model_id, str) or not model_id.strip():
+        raise RoutingInputError(f"guardrail config routing.{profile_name}.model_id must be a non-empty string")
+    if not isinstance(estimated_cost_usd, int | float):
+        raise RoutingInputError(f"guardrail config routing.{profile_name}.estimated_cost_usd must be numeric")
+
+    return RouteProfile(
+        provider=provider,
+        model_id=model_id,
+        route_family=default_profile.route_family,
+        estimated_cost_usd=float(estimated_cost_usd),
+        supports_extended_tools=default_profile.supports_extended_tools,
+        supports_platform_sensitive_work=default_profile.supports_platform_sensitive_work,
+    )

@@ -194,9 +194,25 @@ Do not commit `.env` files with real keys.
 
 ## Step 5: Choose The Model
 
-HiggsAgent does not currently define a stable first-party CLI flag or environment variable for selecting the OpenRouter model used by your outer agent runner.
+HiggsAgent now exposes a first-party model-selection surface through the guardrails config used by the routing policy.
 
-Choose the model in the tool that is actually invoking the agent.
+Set the OpenRouter model identifiers in `config/guardrails.json` or your evaluation-specific copy of the guardrails file.
+
+Minimum routing section:
+
+```json
+{
+  "routing": {
+    "economy": {"provider": "openrouter", "model_id": "openai/gpt-4.1-mini", "estimated_cost_usd": 0.40},
+    "balanced": {"provider": "openrouter", "model_id": "openai/gpt-4.1", "estimated_cost_usd": 2.50},
+    "deep": {"provider": "openrouter", "model_id": "anthropic/claude-sonnet-4", "estimated_cost_usd": 5.00}
+  }
+}
+```
+
+HiggsAgent records the selected provider and model from that routing decision in execution events and attempt summaries, so the analytics output reflects the configured OpenRouter model directly.
+
+Your outer agent runner still needs to use the same provider and model family in practice.
 
 Examples of where model selection usually lives:
 
@@ -211,7 +227,7 @@ The key rule for fair comparison is:
 - keep the Game of Life requirements and ticket board fixed
 - vary only the OpenRouter model between runs
 
-Record the chosen model name explicitly in your run notes.
+Record the chosen guardrails revision or copied config file alongside your run notes.
 
 Examples of model identifiers you might record:
 

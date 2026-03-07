@@ -1,0 +1,29 @@
+{
+  "limits": {
+    "max_prompt_tokens": 16000,
+    "max_completion_tokens": 8000,
+    "max_total_tokens": 24000,
+    "max_cost_usd": 5.0,
+    "max_tool_calls": 8,
+    "provider_timeout_ms": 120000,
+    "ticket_timeout_ms": 900000,
+    "max_attempts": 3
+  },
+  "routing": {
+    "economy": {
+      "provider": "openrouter",
+      "model_id": "google/gemini-2.0-flash-lite",
+      "estimated_cost_usd": 0.2
+    },
+    "balanced": {
+      "provider": "openrouter",
+      "model_id": "openai/gpt-4.1",
+      "estimated_cost_usd": 2.4
+    },
+    "deep": {
+      "provider": "openrouter",
+      "model_id": "anthropic/claude-sonnet-4",
+      "estimated_cost_usd": 4.8
+    }
+  }
+}

@@ -203,3 +203,40 @@ def test_router_blocks_when_no_route_fits_budget() -> None:
 def test_guardrail_loader_rejects_missing_limits() -> None:
     with pytest.raises(ValueError, match="limits"):
         load_route_guardrails(Path("tests/Fixtures/config/guardrails_invalid_missing_limits.json"))
+
+
+def test_guardrail_loader_uses_explicit_routing_profile_overrides() -> None:
+    guardrails = load_route_guardrails(Path("tests/Fixtures/config/guardrails_custom_routes.json"))
+
+    assert guardrails.economy_route.provider == "openrouter"
+    assert guardrails.economy_route.model_id == "google/gemini-2.0-flash-lite"
+    assert guardrails.economy_route.estimated_cost_usd == pytest.approx(0.2)
+    assert guardrails.deep_route.model_id == "anthropic/claude-sonnet-4"
+
+
+def test_docs_ticket_uses_configured_economy_model() -> None:
+    semantics = classify_ticket(
+        {
+            "id": "T-200006",
+            "type": "docs",
+            "priority": "p1",
+            "effort": "s",
+            "higgs_schema_version": 1,
+            "higgs_platform": "agnostic",
+        }
+    )
+
+    decision = choose_route(
+        semantics,
+        load_route_guardrails(Path("tests/Fixtures/config/guardrails_custom_routes.json")),
+    )
+
+    assert decision.selected is True
+    assert decision.provider == "openrouter"
+    assert decision.model_id == "google/gemini-2.0-flash-lite"
+    assert "selected_model:google/gemini-2.0-flash-lite" in decision.rationale
+
+
+def test_guardrail_loader_rejects_invalid_routing_model_id() -> None:
+    with pytest.raises(ValueError, match=r"routing\.economy\.model_id"):
+        load_route_guardrails(Path("tests/Fixtures/config/guardrails_invalid_route_model.json"))

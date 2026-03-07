@@ -19,5 +19,27 @@
     "default_write_mode": "review",
     "allow_autonomous_commit": false,
     "allow_direct_push": false
+  },
+  "routing": {
+    "economy": {
+      "provider": "openrouter",
+      "model_id": "openai/gpt-4o-mini",
+      "estimated_cost_usd": 0.35
+    },
+    "balanced": {
+      "provider": "openrouter",
+      "model_id": "openai/gpt-4o",
+      "estimated_cost_usd": 2.0
+    },
+    "deep": {
+      "provider": "openrouter",
+      "model_id": "anthropic/claude-3.5-sonnet",
+      "estimated_cost_usd": 4.5
+    },
+    "local": {
+      "provider": "local",
+      "model_id": "local/llama3.1:8b",
+      "estimated_cost_usd": 0.0
+    }
   }
 }

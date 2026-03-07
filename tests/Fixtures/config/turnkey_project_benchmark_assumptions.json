@@ -1,0 +1,23 @@
+{
+  "fixture_id": "turnkey-project-independent-ready-set",
+  "expected_attempts": 2,
+  "expected_completed_tickets": [
+    "T-930001",
+    "T-930002"
+  ],
+  "expected_group_by": [
+    "provider",
+    "model",
+    "ticket_type"
+  ],
+  "validation_commands": [
+    "uv run pytest tests"
+  ],
+  "commit_policy": "disabled",
+  "comparison_constraints": [
+    "same guardrails file",
+    "same write policy file",
+    "same validation command set",
+    "independent ready tickets only"
+  ]
+}

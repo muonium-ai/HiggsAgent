@@ -1,0 +1,14 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "{\"summary\": \"Created alpha slice\", \"directories\": [\"src\", \"tests\"], \"writes\": [{\"path\": \"src/app_alpha.py\", \"content\": \"def alpha_value():\\n    return 1\\n\"}, {\"path\": \"tests/test_alpha.py\", \"content\": \"from app_alpha import alpha_value\\n\\n\\ndef test_alpha_value():\\n    assert alpha_value() == 1\\n\"}]}"
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 21,
+    "total_tokens": 35
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "{\"summary\": \"Created beta slice\", \"directories\": [\"src\", \"tests\"], \"writes\": [{\"path\": \"src/app_beta.py\", \"content\": \"def beta_value():\\n    return 2\\n\"}, {\"path\": \"tests/test_beta.py\", \"content\": \"from app_beta import beta_value\\n\\n\\ndef test_beta_value():\\n    assert beta_value() == 2\\n\"}]}"
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 15,
+    "completion_tokens": 23,
+    "total_tokens": 38
+  }
+}

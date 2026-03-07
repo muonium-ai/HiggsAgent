@@ -23,6 +23,7 @@ from higgs_agent.runtime import (
     RuntimeConfigError,
     parse_changed_file_spec,
     run_autonomous_ticket,
+    run_turnkey_project,
     run_ticketed_project,
 )
 
@@ -45,6 +46,10 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "run" and args.run_command == "autonomous-ticket":
         _run_autonomous_ticket(args)
+        return
+
+    if args.command == "run" and args.run_command == "turnkey-project":
+        _run_turnkey_project(args)
         return
 
     if args.command == "validate" and args.validate_command == "tickets":
@@ -113,6 +118,23 @@ def _build_parser() -> argparse.ArgumentParser:
     run_autonomous_ticket_parser.add_argument("--owner", default="coordinator")
     run_autonomous_ticket_parser.add_argument("--muontickets-cli", type=Path)
     run_autonomous_ticket_parser.add_argument("--openrouter-api-key")
+
+    run_turnkey_project_parser = run_subparsers.add_parser("turnkey-project")
+    run_turnkey_project_parser.add_argument("--repo-root", type=Path, default=Path("."))
+    run_turnkey_project_parser.add_argument("--requirements", type=Path, required=True)
+    run_turnkey_project_parser.add_argument("--tickets-dir", type=Path, required=True)
+    run_turnkey_project_parser.add_argument("--guardrails", type=Path, required=True)
+    run_turnkey_project_parser.add_argument("--write-policy", type=Path, required=True)
+    run_turnkey_project_parser.add_argument(
+        "--validation-command",
+        action="append",
+        required=True,
+    )
+    run_turnkey_project_parser.add_argument("--owner", default="coordinator")
+    run_turnkey_project_parser.add_argument("--muontickets-cli", type=Path)
+    run_turnkey_project_parser.add_argument("--project-run-id")
+    run_turnkey_project_parser.add_argument("--resume", action="store_true")
+    run_turnkey_project_parser.add_argument("--openrouter-api-key")
 
     validate_tickets_parser = validate_subparsers.add_parser("tickets")
     validate_tickets_parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -289,6 +311,47 @@ def _run_autonomous_ticket(args: argparse.Namespace) -> None:
     if outcome.execution_result.output_text:
         print("output:")
         print(outcome.execution_result.output_text)
+
+
+def _run_turnkey_project(args: argparse.Namespace) -> None:
+    try:
+        repo_root = _require_directory_path(args.repo_root, flag_name="--repo-root")
+        requirements_path = _require_file_path(args.requirements, flag_name="--requirements")
+        tickets_dir = _require_directory_path(args.tickets_dir, flag_name="--tickets-dir")
+        guardrails_path = _require_file_path(args.guardrails, flag_name="--guardrails")
+        write_policy_path = _require_file_path(args.write_policy, flag_name="--write-policy")
+        muontickets_cli_path = None
+        if args.muontickets_cli is not None:
+            muontickets_cli_path = _require_file_path(args.muontickets_cli, flag_name="--muontickets-cli")
+        openrouter_api_key = args.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY")
+        if not openrouter_api_key:
+            raise RuntimeConfigError(
+                "OpenRouter API key required via --openrouter-api-key or OPENROUTER_API_KEY"
+            )
+        outcome = run_turnkey_project(
+            repo_root=repo_root,
+            requirements_path=requirements_path,
+            tickets_dir=tickets_dir,
+            guardrails_path=guardrails_path,
+            write_policy_path=write_policy_path,
+            validation_commands=tuple(args.validation_command),
+            owner=args.owner,
+            muontickets_cli_path=muontickets_cli_path,
+            project_run_id=args.project_run_id,
+            resume=args.resume,
+            openrouter_api_key=openrouter_api_key,
+        )
+    except (FileNotFoundError, RuntimeConfigError, ValueError) as exc:
+        raise SystemExit(f"run turnkey-project failed: {exc}") from exc
+
+    print(f"project_run_id: {outcome.project_run_id}")
+    print(f"status: {outcome.status}")
+    print(f"terminal_condition: {outcome.terminal_condition}")
+    print(f"resumed: {str(outcome.resumed).lower()}")
+    print(f"attempted_tickets: {', '.join(ticket.ticket_id for ticket in outcome.attempted_tickets) or 'none'}")
+    print(f"completed_tickets: {', '.join(outcome.completed_tickets) or 'none'}")
+    print(f"checkpoint_path: {outcome.checkpoint_path.relative_to(repo_root)}")
+    print(f"summary_path: {outcome.summary_path.relative_to(repo_root)}")
 
 
 def _run_validate_tickets(args: argparse.Namespace) -> None:

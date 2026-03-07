@@ -184,3 +184,167 @@ def test_run_autonomous_ticket_rejects_invalid_model_payload(
     assert outcome.execution_result.status == "failed"
     assert outcome.validation_decision.decision == "rejected"
     assert any(call[0] == "comment" for call in mt_calls)
+
+
+def test_run_turnkey_project_reuses_single_ticket_runtime_and_persists_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = tmp_path / "guardrails.json"
+    write_policy_path = tmp_path / "write-policy.json"
+    mt_cli_path = tmp_path / "mt.py"
+
+    requirements_path.write_text("Build the sample app.\n")
+    guardrails_path.write_text(Path("config/guardrails.example.json").read_text())
+    write_policy_path.write_text(Path("config/write-policy.example.json").read_text())
+    mt_cli_path.write_text("print('ok')\n")
+
+    captured_calls: list[dict[str, object]] = []
+    outcomes = [
+        _project_outcome(ticket_id="T-000201", decision="accepted"),
+        _project_outcome(ticket_id="T-000202", decision="accepted"),
+        runtime.RuntimeConfigError(f"no ready tickets found in {tickets_dir}"),
+    ]
+
+    def fake_run_autonomous_ticket(**kwargs):
+        captured_calls.append(kwargs)
+        next_outcome = outcomes.pop(0)
+        if isinstance(next_outcome, Exception):
+            raise next_outcome
+        return next_outcome
+
+    monkeypatch.setattr(runtime, "run_autonomous_ticket", fake_run_autonomous_ticket)
+
+    result = runtime.run_turnkey_project(
+        repo_root=repo_root,
+        requirements_path=requirements_path,
+        tickets_dir=tickets_dir,
+        guardrails_path=guardrails_path,
+        write_policy_path=write_policy_path,
+        validation_commands=("uv run pytest tests",),
+        openrouter_api_key="test-key",
+        muontickets_cli_path=mt_cli_path,
+    )
+
+    assert len(captured_calls) == 3
+    assert captured_calls[0]["validation_commands"] == ("uv run pytest tests",)
+    assert result.status == "succeeded"
+    assert result.terminal_condition == "no_ready_ticket"
+    assert result.completed_tickets == ("T-000201", "T-000202")
+    checkpoint = json.loads(result.checkpoint_path.read_text())
+    assert checkpoint["completed_tickets"] == ["T-000201", "T-000202"]
+    summary = json.loads(result.summary_path.read_text())
+    assert summary["terminal_condition"] == "no_ready_ticket"
+
+
+def test_run_turnkey_project_resume_appends_to_existing_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = tmp_path / "guardrails.json"
+    write_policy_path = tmp_path / "write-policy.json"
+    mt_cli_path = tmp_path / "mt.py"
+
+    requirements_path.write_text("Build the sample app.\n")
+    guardrails_path.write_text(Path("config/guardrails.example.json").read_text())
+    write_policy_path.write_text(Path("config/write-policy.example.json").read_text())
+    mt_cli_path.write_text("print('ok')\n")
+
+    project_run_id = "project-run-resume"
+    checkpoint_path = repo_root / ".higgs" / "local" / "project-runs" / project_run_id / "checkpoint.json"
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "project_run_id": project_run_id,
+                "started_at": "2026-03-07T00:00:00Z",
+                "updated_at": "2026-03-07T00:00:00Z",
+                "status": "running",
+                "terminal_condition": None,
+                "resumed": False,
+                "attempted_tickets": [
+                    {
+                        "ticket_id": "T-000201",
+                        "execution_status": "succeeded",
+                        "validation_decision": "accepted",
+                        "validation_reason": None,
+                        "telemetry_paths": {"events": ".higgs/local/runs/run-1/attempt-1/events.ndjson"},
+                    }
+                ],
+                "completed_tickets": ["T-000201"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+
+    outcomes = [
+        _project_outcome(ticket_id="T-000202", decision="accepted"),
+        runtime.RuntimeConfigError(f"no ready tickets found in {tickets_dir}"),
+    ]
+
+    def fake_run_autonomous_ticket(**kwargs):
+        next_outcome = outcomes.pop(0)
+        if isinstance(next_outcome, Exception):
+            raise next_outcome
+        return next_outcome
+
+    monkeypatch.setattr(runtime, "run_autonomous_ticket", fake_run_autonomous_ticket)
+
+    result = runtime.run_turnkey_project(
+        repo_root=repo_root,
+        requirements_path=requirements_path,
+        tickets_dir=tickets_dir,
+        guardrails_path=guardrails_path,
+        write_policy_path=write_policy_path,
+        validation_commands=("uv run pytest tests",),
+        openrouter_api_key="test-key",
+        muontickets_cli_path=mt_cli_path,
+        project_run_id=project_run_id,
+        resume=True,
+    )
+
+    assert result.resumed is True
+    assert result.completed_tickets == ("T-000201", "T-000202")
+    checkpoint = json.loads(result.checkpoint_path.read_text())
+    assert checkpoint["resumed"] is True
+    assert checkpoint["completed_tickets"] == ["T-000201", "T-000202"]
+
+
+def _project_outcome(*, ticket_id: str, decision: str):
+    return type(
+        "FakeOutcome",
+        (),
+        {
+            "ticket": type("Ticket", (), {"id": ticket_id})(),
+            "execution_result": type(
+                "ExecutionResult",
+                (),
+                {
+                    "status": "succeeded" if decision != "rejected" else "failed",
+                    "metadata": {
+                        "telemetry_paths": {
+                            "events": f".higgs/local/runs/{ticket_id}/attempt-1/events.ndjson",
+                            "artifacts_dir": f".higgs/local/runs/{ticket_id}/attempt-1/artifacts",
+                            "attempt_summaries": ".higgs/local/analytics/attempt-summaries.ndjson",
+                        }
+                    },
+                },
+            )(),
+            "validation_decision": type(
+                "ValidationDecision",
+                (),
+                {"decision": decision, "reason": None},
+            )(),
+        },
+    )()

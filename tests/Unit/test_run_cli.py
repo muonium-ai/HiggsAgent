@@ -227,6 +227,108 @@ def test_run_autonomous_ticket_cli_requires_api_key(
         )
 
 
+def test_run_turnkey_project_cli_invokes_runtime_and_prints_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = repo_root / "guardrails.json"
+    write_policy_path = repo_root / "write-policy.json"
+    mt_cli_path = repo_root / "mt.py"
+    requirements_path.write_text("requirements\n")
+    guardrails_path.write_text("{}\n")
+    write_policy_path.write_text("{}\n")
+    mt_cli_path.write_text("print('ok')\n")
+
+    captured: dict[str, object] = {}
+
+    def fake_run_turnkey_project(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            project_run_id="project-run-123",
+            status="succeeded",
+            terminal_condition="no_ready_ticket",
+            resumed=False,
+            attempted_tickets=(SimpleNamespace(ticket_id="T-900010"), SimpleNamespace(ticket_id="T-900011")),
+            completed_tickets=("T-900010", "T-900011"),
+            checkpoint_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "checkpoint.json",
+            summary_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "summary.json",
+        )
+
+    monkeypatch.setattr(cli, "run_turnkey_project", fake_run_turnkey_project)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    cli.main(
+        [
+            "run",
+            "turnkey-project",
+            "--repo-root",
+            str(repo_root),
+            "--requirements",
+            str(requirements_path),
+            "--tickets-dir",
+            str(tickets_dir),
+            "--guardrails",
+            str(guardrails_path),
+            "--write-policy",
+            str(write_policy_path),
+            "--validation-command",
+            "uv run pytest tests",
+            "--muontickets-cli",
+            str(mt_cli_path),
+            "--project-run-id",
+            "project-run-123",
+            "--resume",
+        ]
+    )
+
+    assert captured["project_run_id"] == "project-run-123"
+    assert captured["resume"] is True
+    assert captured["validation_commands"] == ("uv run pytest tests",)
+    output = capsys.readouterr().out
+    assert "project_run_id: project-run-123" in output
+    assert "terminal_condition: no_ready_ticket" in output
+
+
+def test_run_turnkey_project_cli_requires_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = repo_root / "guardrails.json"
+    write_policy_path = repo_root / "write-policy.json"
+    requirements_path.write_text("requirements\n")
+    guardrails_path.write_text("{}\n")
+    write_policy_path.write_text("{}\n")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(SystemExit, match="OpenRouter API key required"):
+        cli.main(
+            [
+                "run",
+                "turnkey-project",
+                "--repo-root",
+                str(repo_root),
+                "--requirements",
+                str(requirements_path),
+                "--tickets-dir",
+                str(tickets_dir),
+                "--guardrails",
+                str(guardrails_path),
+                "--write-policy",
+                str(write_policy_path),
+                "--validation-command",
+                "uv run pytest tests",
+            ]
+        )
+
+
 def test_validate_tickets_cli_invokes_muontickets_validate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

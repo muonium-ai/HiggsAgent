@@ -9,7 +9,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 from uuid import uuid4
 
 from higgs_agent.application import DispatchOutcome, dispatch_next_ready_ticket
@@ -61,6 +61,190 @@ class ValidationCommandResult:
     @property
     def passed(self) -> bool:
         return self.exit_code == 0
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectTicketAttempt:
+    """One autonomous single-ticket attempt within a project run."""
+
+    ticket_id: str
+    execution_status: str
+    validation_decision: str
+    validation_reason: str | None
+    telemetry_paths: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectRunResult:
+    """Project-level autonomous orchestration result."""
+
+    project_run_id: str
+    status: str
+    terminal_condition: str
+    resumed: bool
+    attempted_tickets: tuple[ProjectTicketAttempt, ...]
+    completed_tickets: tuple[str, ...]
+    checkpoint_path: Path
+    summary_path: Path
+
+
+def run_turnkey_project(
+    *,
+    repo_root: Path,
+    requirements_path: Path,
+    tickets_dir: Path,
+    guardrails_path: Path,
+    write_policy_path: Path,
+    validation_commands: tuple[str, ...],
+    openrouter_api_key: str,
+    owner: str = "coordinator",
+    muontickets_cli_path: Path | None = None,
+    project_run_id: str | None = None,
+    resume: bool = False,
+) -> ProjectRunResult:
+    """Execute autonomous ticket runs until the repository reaches a terminal condition."""
+
+    if not validation_commands:
+        raise RuntimeConfigError("at least one validation command is required")
+
+    repo_root = repo_root.resolve()
+    run_id = project_run_id or f"project-run-{uuid4().hex[:12]}"
+    run_dir = repo_root / ".higgs" / "local" / "project-runs" / run_id
+    checkpoint_path = run_dir / "checkpoint.json"
+    summary_path = run_dir / "summary.json"
+
+    if resume:
+        state = _load_project_run_state(checkpoint_path=checkpoint_path, expected_project_run_id=run_id)
+        state["resumed"] = True
+    else:
+        if checkpoint_path.exists():
+            raise RuntimeConfigError(
+                f"project checkpoint already exists for {run_id}; pass --resume to continue it"
+            )
+        state = {
+            "schema_version": 1,
+            "project_run_id": run_id,
+            "started_at": utc_now_iso(),
+            "updated_at": utc_now_iso(),
+            "status": "running",
+            "terminal_condition": None,
+            "resumed": False,
+            "attempted_tickets": [],
+            "completed_tickets": [],
+        }
+    _save_project_run_state(checkpoint_path, state)
+
+    while True:
+        try:
+            outcome = run_autonomous_ticket(
+                repo_root=repo_root,
+                requirements_path=requirements_path,
+                tickets_dir=tickets_dir,
+                guardrails_path=guardrails_path,
+                write_policy_path=write_policy_path,
+                validation_commands=validation_commands,
+                openrouter_api_key=openrouter_api_key,
+                owner=owner,
+                muontickets_cli_path=muontickets_cli_path,
+            )
+        except RuntimeConfigError as exc:
+            if "no ready tickets found" not in str(exc):
+                raise
+            state["terminal_condition"] = "no_ready_ticket"
+            state["status"] = "succeeded"
+            state["updated_at"] = utc_now_iso()
+            _save_project_run_state(checkpoint_path, state)
+            _save_project_run_summary(summary_path, state)
+            return _build_project_run_result(state, checkpoint_path=checkpoint_path, summary_path=summary_path)
+
+        attempt_record = {
+            "ticket_id": outcome.ticket.id,
+            "execution_status": outcome.execution_result.status,
+            "validation_decision": outcome.validation_decision.decision,
+            "validation_reason": outcome.validation_decision.reason,
+            "telemetry_paths": dict(outcome.execution_result.metadata.get("telemetry_paths", {})),
+        }
+        attempted_tickets = list(state["attempted_tickets"])
+        attempted_tickets.append(attempt_record)
+        state["attempted_tickets"] = attempted_tickets
+
+        if outcome.validation_decision.decision == "accepted":
+            completed_tickets = list(state["completed_tickets"])
+            completed_tickets.append(outcome.ticket.id)
+            state["completed_tickets"] = completed_tickets
+            state["updated_at"] = utc_now_iso()
+            _save_project_run_state(checkpoint_path, state)
+            continue
+
+        state["terminal_condition"] = (
+            "review_handoff_required"
+            if outcome.validation_decision.decision == "handoff_required"
+            else "ticket_rejected"
+        )
+        state["status"] = "blocked"
+        state["updated_at"] = utc_now_iso()
+        _save_project_run_state(checkpoint_path, state)
+        _save_project_run_summary(summary_path, state)
+        return _build_project_run_result(state, checkpoint_path=checkpoint_path, summary_path=summary_path)
+
+
+def _load_project_run_state(*, checkpoint_path: Path, expected_project_run_id: str) -> dict[str, Any]:
+    if not checkpoint_path.exists():
+        raise RuntimeConfigError(f"project checkpoint not found for {expected_project_run_id}: {checkpoint_path}")
+    payload = json.loads(checkpoint_path.read_text())
+    if payload.get("project_run_id") != expected_project_run_id:
+        raise RuntimeConfigError(
+            f"project checkpoint id mismatch: expected {expected_project_run_id}, found {payload.get('project_run_id')}"
+        )
+    return payload
+
+
+def _save_project_run_state(checkpoint_path: Path, state: dict[str, Any]) -> None:
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint_path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+
+
+def _save_project_run_summary(summary_path: Path, state: dict[str, Any]) -> None:
+    summary = {
+        "schema_version": state["schema_version"],
+        "project_run_id": state["project_run_id"],
+        "status": state["status"],
+        "terminal_condition": state["terminal_condition"],
+        "resumed": state["resumed"],
+        "attempted_tickets": state["attempted_tickets"],
+        "completed_tickets": state["completed_tickets"],
+        "updated_at": state["updated_at"],
+    }
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+
+
+def _build_project_run_result(
+    state: dict[str, Any],
+    *,
+    checkpoint_path: Path,
+    summary_path: Path,
+) -> ProjectRunResult:
+    attempts = tuple(
+        ProjectTicketAttempt(
+            ticket_id=record["ticket_id"],
+            execution_status=record["execution_status"],
+            validation_decision=record["validation_decision"],
+            validation_reason=record.get("validation_reason"),
+            telemetry_paths=dict(record.get("telemetry_paths", {})),
+        )
+        for record in state["attempted_tickets"]
+    )
+    return ProjectRunResult(
+        project_run_id=state["project_run_id"],
+        status=state["status"],
+        terminal_condition=state["terminal_condition"] or "running",
+        resumed=bool(state.get("resumed", False)),
+        attempted_tickets=attempts,
+        completed_tickets=tuple(state["completed_tickets"]),
+        checkpoint_path=checkpoint_path,
+        summary_path=summary_path,
+    )
 
 
 def parse_changed_file_spec(spec: str) -> ProposedFileChange:

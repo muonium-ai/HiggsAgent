@@ -83,6 +83,10 @@ Phase 6 may rely only on stabilized earlier-phase contracts:
 - `T-000055`: implement the OpenRouter-backed autonomous single-ticket execution loop
 - `T-000056`: add autonomous single-ticket integration, regression, and failure-path coverage
 - `T-000057`: write operator and adopter documentation for autonomous single-ticket execution
+- `T-000063`: implement scaffold materialization from autonomous coding responses
+- `T-000064`: implement patch and diff application for iterative autonomous edits
+- `T-000065`: add fixture-backed coverage for scaffold and diff materialization
+- `T-000066`: document supported autonomous response materialization formats
 
 ## Delivery Rules
 

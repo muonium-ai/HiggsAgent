@@ -113,6 +113,21 @@ def test_write_gate_rejects_when_no_changes_are_proposed() -> None:
     assert decision.reason == "no_repository_mutation_proposed"
 
 
+def test_write_gate_rejects_failed_validation_commands() -> None:
+    decision = evaluate_write_request(
+        _validation_input(
+            changed_files=(
+                ProposedFileChange(path="src/higgs_agent/runtime.py", additions=20, deletions=0),
+            ),
+            validation_passed=False,
+        ),
+        load_write_policy(Path("config/write-policy.example.json")),
+    )
+
+    assert decision.decision == "rejected"
+    assert decision.reason == "validation_failed"
+
+
 def test_write_policy_loader_rejects_missing_fields() -> None:
     with pytest.raises(ValueError, match="allowed_paths"):
         load_write_policy(Path("tests/Fixtures/config/write_policy_invalid_missing_allowed.json"))
@@ -123,6 +138,7 @@ def _validation_input(
     executor_status: str = "succeeded",
     output_text: str = "Sanitized output summary.",
     changed_files: tuple[ProposedFileChange, ...],
+    validation_passed: bool = True,
 ) -> ValidationInput:
     return ValidationInput(
         ticket_id="T-000015",
@@ -132,5 +148,6 @@ def _validation_input(
         output_text=output_text,
         changed_files=changed_files,
         validation_summary="tests passed, write gate evaluated",
+        validation_passed=validation_passed,
         usage=ProviderUsage(total_tokens=1800, cost_usd=0.92, latency_ms=4823),
     )

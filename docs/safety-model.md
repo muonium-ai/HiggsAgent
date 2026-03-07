@@ -39,6 +39,20 @@ These defaults are configuration values, not hard-coded product promises.
 - Autonomous commits are disabled by default in early phases.
 - Raw prompts, raw responses, provider payloads, and local execution traces must never be committed by default.
 
+## Autonomous Session Controls
+
+Phase 6 autonomous coding introduces additional policy controls:
+
+- autonomous execution must be explicitly enabled
+- session step count must be bounded per ticket attempt
+- allowed command classes must be explicit and reviewable
+- validation commands must be configured rather than improvised
+- scaffold creation and patch application formats must be explicitly allowed
+- automatic claim, comment, and `needs_review` transitions must be operator-controlled
+- local commit creation remains opt-in and disabled by default
+
+Autonomous coding does not weaken the existing write policy. It only automates bounded repository mutation under the same review-oriented controls.
+
 ## Review Handoff Rules
 
 Human review is mandatory when any of the following are true:
@@ -57,6 +71,8 @@ Human review is mandatory when any of the following are true:
 - policy
 - secret-suspect
 - coordination
+- materialization
+- workflow
 
 Transient failures may retry. Policy and secret-suspect failures are hard stops.
 

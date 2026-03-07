@@ -118,6 +118,115 @@ def test_run_ticketed_project_cli_requires_api_key(
         )
 
 
+def test_run_autonomous_ticket_cli_invokes_runtime_and_prints_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = repo_root / "guardrails.json"
+    write_policy_path = repo_root / "write-policy.json"
+    mt_cli_path = repo_root / "mt.py"
+    requirements_path.write_text("requirements\n")
+    guardrails_path.write_text("{}\n")
+    write_policy_path.write_text("{}\n")
+    mt_cli_path.write_text("print('ok')\n")
+
+    captured: dict[str, object] = {}
+
+    def fake_run_autonomous_ticket(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            ticket=SimpleNamespace(id="T-900002"),
+            route=SimpleNamespace(provider="openrouter", model_id="openai/gpt-4.1"),
+            execution_result=SimpleNamespace(
+                status="succeeded",
+                output_text='{"summary":"done"}',
+                metadata={
+                    "telemetry_paths": {
+                        "events": ".higgs/local/runs/run-1/attempt-1/events.ndjson",
+                        "artifacts_dir": ".higgs/local/runs/run-1/attempt-1/artifacts",
+                        "attempt_summaries": ".higgs/local/analytics/attempt-summaries.ndjson",
+                    }
+                },
+            ),
+            validation_decision=SimpleNamespace(
+                decision="accepted",
+                changed_paths=("src/app.py", "tests/test_app.py"),
+            ),
+        )
+
+    monkeypatch.setattr(cli, "run_autonomous_ticket", fake_run_autonomous_ticket)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    cli.main(
+        [
+            "run",
+            "autonomous-ticket",
+            "--repo-root",
+            str(repo_root),
+            "--requirements",
+            str(requirements_path),
+            "--tickets-dir",
+            str(tickets_dir),
+            "--guardrails",
+            str(guardrails_path),
+            "--write-policy",
+            str(write_policy_path),
+            "--validation-command",
+            "uv run pytest tests",
+            "--muontickets-cli",
+            str(mt_cli_path),
+        ]
+    )
+
+    assert captured["repo_root"] == repo_root
+    assert captured["requirements_path"] == requirements_path
+    assert captured["validation_commands"] == ("uv run pytest tests",)
+    assert captured["muontickets_cli_path"] == mt_cli_path
+    output = capsys.readouterr().out
+    assert "ticket: T-900002" in output
+    assert "changed_paths: src/app.py, tests/test_app.py" in output
+
+
+def test_run_autonomous_ticket_cli_requires_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = repo_root / "guardrails.json"
+    write_policy_path = repo_root / "write-policy.json"
+    requirements_path.write_text("requirements\n")
+    guardrails_path.write_text("{}\n")
+    write_policy_path.write_text("{}\n")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(SystemExit, match="OpenRouter API key required"):
+        cli.main(
+            [
+                "run",
+                "autonomous-ticket",
+                "--repo-root",
+                str(repo_root),
+                "--requirements",
+                str(requirements_path),
+                "--tickets-dir",
+                str(tickets_dir),
+                "--guardrails",
+                str(guardrails_path),
+                "--write-policy",
+                str(write_policy_path),
+                "--validation-command",
+                "uv run pytest tests",
+            ]
+        )
+
+
 def test_validate_tickets_cli_invokes_muontickets_validate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

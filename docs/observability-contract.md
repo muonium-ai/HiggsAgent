@@ -43,8 +43,16 @@ Optional but common fields include:
 - `route.selected`
 - `guardrails.checked`
 - `provider.requested`
+- `prompt.rendered`
+- `workspace.read`
+- `directory.created`
+- `file.written`
+- `file.patched`
 - `tool.call.started`
 - `tool.call.completed`
+- `command.started`
+- `command.completed`
+- `ticket.workflow.updated`
 - `provider.responded`
 - `validation.completed`
 - `write_gate.decided`
@@ -58,6 +66,7 @@ Optional but common fields include:
 - `execution.completed` must be emitted exactly once per attempt.
 - Failures should be represented both on the failing event and on the terminal attempt summary.
 - Tool and provider artifacts should be referenced by path and hash rather than duplicated inline.
+- Autonomous coding events must make workspace mutations and workflow transitions reconstructable without requiring raw provider payload inspection.
 
 ## Attempt Summary
 

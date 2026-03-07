@@ -78,6 +78,26 @@ These are intentionally not committed yet:
 - Automatic local-runtime discovery
 - Hosted-to-local fallback policy
 
+## Phase 6 Autonomous Runtime Expectations
+
+Phase 6 adds a first-party autonomous coding runtime without changing the core Python-plus-`uv` toolchain.
+
+- Autonomous coding remains a Python runtime surface managed through `uv`.
+- The runtime must accept explicit repository-root, policy, and credential inputs.
+- Operators should not be required to hand-author changed-file or validation-summary arguments for autonomous runs.
+- Validation commands must come from explicit configuration rather than ad hoc prompt text.
+- Autonomous ticket workflow changes must continue to flow through MuonTickets commands.
+
+Planned autonomous operator controls include:
+
+- enabling or disabling autonomous execution
+- bounding session steps and command classes
+- configuring validation commands
+- allowing or disallowing scaffold and patch materialization formats
+- controlling auto-claim, auto-comment, `needs_review` transition, and optional local commits
+
+These controls are contract expectations for the later Phase 6 runtime surface.
+
 ## Hybrid Operational Limits
 
 - `higgs_execution_target=local` requires an explicit local runtime and currently supports toolless requests only.

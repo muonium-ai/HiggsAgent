@@ -19,7 +19,12 @@ from higgs_agent.analytics import (
     render_report_table,
 )
 from higgs_agent.bootstrap import BootstrapError, available_sample_projects, bootstrap_sample_project
-from higgs_agent.runtime import RuntimeConfigError, parse_changed_file_spec, run_ticketed_project
+from higgs_agent.runtime import (
+    RuntimeConfigError,
+    parse_changed_file_spec,
+    run_autonomous_ticket,
+    run_ticketed_project,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -36,6 +41,10 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "run" and args.run_command == "ticketed-project":
         _run_ticketed_project(args)
+        return
+
+    if args.command == "run" and args.run_command == "autonomous-ticket":
+        _run_autonomous_ticket(args)
         return
 
     if args.command == "validate" and args.validate_command == "tickets":
@@ -89,6 +98,21 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     run_ticketed_project_parser.add_argument("--validation-summary", required=True)
     run_ticketed_project_parser.add_argument("--openrouter-api-key")
+
+    run_autonomous_ticket_parser = run_subparsers.add_parser("autonomous-ticket")
+    run_autonomous_ticket_parser.add_argument("--repo-root", type=Path, default=Path("."))
+    run_autonomous_ticket_parser.add_argument("--requirements", type=Path, required=True)
+    run_autonomous_ticket_parser.add_argument("--tickets-dir", type=Path, required=True)
+    run_autonomous_ticket_parser.add_argument("--guardrails", type=Path, required=True)
+    run_autonomous_ticket_parser.add_argument("--write-policy", type=Path, required=True)
+    run_autonomous_ticket_parser.add_argument(
+        "--validation-command",
+        action="append",
+        required=True,
+    )
+    run_autonomous_ticket_parser.add_argument("--owner", default="coordinator")
+    run_autonomous_ticket_parser.add_argument("--muontickets-cli", type=Path)
+    run_autonomous_ticket_parser.add_argument("--openrouter-api-key")
 
     validate_tickets_parser = validate_subparsers.add_parser("tickets")
     validate_tickets_parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -211,6 +235,52 @@ def _run_ticketed_project(args: argparse.Namespace) -> None:
     print(f"model: {outcome.route.model_id or 'blocked'}")
     print(f"execution_status: {outcome.execution_result.status}")
     print(f"validation_decision: {outcome.validation_decision.decision}")
+    telemetry_paths = getattr(outcome.execution_result, "metadata", {}).get("telemetry_paths", {})
+    if telemetry_paths:
+        print(f"events_path: {telemetry_paths['events']}")
+        print(f"artifacts_dir: {telemetry_paths['artifacts_dir']}")
+        print(f"attempt_summaries_path: {telemetry_paths['attempt_summaries']}")
+    if outcome.execution_result.output_text:
+        print("output:")
+        print(outcome.execution_result.output_text)
+
+
+def _run_autonomous_ticket(args: argparse.Namespace) -> None:
+    try:
+        repo_root = _require_directory_path(args.repo_root, flag_name="--repo-root")
+        requirements_path = _require_file_path(args.requirements, flag_name="--requirements")
+        tickets_dir = _require_directory_path(args.tickets_dir, flag_name="--tickets-dir")
+        guardrails_path = _require_file_path(args.guardrails, flag_name="--guardrails")
+        write_policy_path = _require_file_path(args.write_policy, flag_name="--write-policy")
+        muontickets_cli_path = None
+        if args.muontickets_cli is not None:
+            muontickets_cli_path = _require_file_path(args.muontickets_cli, flag_name="--muontickets-cli")
+        openrouter_api_key = args.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY")
+        if not openrouter_api_key:
+            raise RuntimeConfigError(
+                "OpenRouter API key required via --openrouter-api-key or OPENROUTER_API_KEY"
+            )
+        outcome = run_autonomous_ticket(
+            repo_root=repo_root,
+            requirements_path=requirements_path,
+            tickets_dir=tickets_dir,
+            guardrails_path=guardrails_path,
+            write_policy_path=write_policy_path,
+            validation_commands=tuple(args.validation_command),
+            owner=args.owner,
+            muontickets_cli_path=muontickets_cli_path,
+            openrouter_api_key=openrouter_api_key,
+        )
+    except (FileNotFoundError, RuntimeConfigError, ValueError) as exc:
+        raise SystemExit(f"run autonomous-ticket failed: {exc}") from exc
+
+    print(f"ticket: {outcome.ticket.id}")
+    print(f"provider: {outcome.route.provider or 'blocked'}")
+    print(f"model: {outcome.route.model_id or 'blocked'}")
+    print(f"execution_status: {outcome.execution_result.status}")
+    print(f"validation_decision: {outcome.validation_decision.decision}")
+    if outcome.validation_decision.changed_paths:
+        print(f"changed_paths: {', '.join(outcome.validation_decision.changed_paths)}")
     telemetry_paths = getattr(outcome.execution_result, "metadata", {}).get("telemetry_paths", {})
     if telemetry_paths:
         print(f"events_path: {telemetry_paths['events']}")

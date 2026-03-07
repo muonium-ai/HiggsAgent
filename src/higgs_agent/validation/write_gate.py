@@ -62,6 +62,7 @@ class ValidationInput:
     output_text: str
     changed_files: tuple[ProposedFileChange, ...]
     validation_summary: str
+    validation_passed: bool = True
     usage: ProviderUsage | None = None
     diff_is_deterministic: bool = True
 
@@ -125,6 +126,16 @@ def evaluate_write_request(
         return ValidationDecision(
             decision="rejected",
             reason="executor_did_not_succeed",
+            diagnostics=tuple(diagnostics),
+            changed_paths=changed_paths,
+            requires_human_review=False,
+        )
+
+    if not validation_input.validation_passed:
+        diagnostics.append("validation_failed")
+        return ValidationDecision(
+            decision="rejected",
+            reason="validation_failed",
             diagnostics=tuple(diagnostics),
             changed_paths=changed_paths,
             requires_human_review=False,

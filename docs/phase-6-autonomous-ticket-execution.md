@@ -39,6 +39,7 @@ The phase is successful when an operator can invoke a first-party HiggsAgent com
 Phase 6 may rely only on stabilized earlier-phase contracts:
 
 - dispatcher, provider, and validation boundaries from [phase-1-dispatcher-mvp.md](phase-1-dispatcher-mvp.md)
+- autonomous coding-session normalization from [autonomous-coding-session-contract.md](autonomous-coding-session-contract.md)
 - analytics and observability compatibility from [phase-2-analytics-observability.md](phase-2-analytics-observability.md) and [observability-contract.md](observability-contract.md)
 - hybrid execution boundaries from [phase-3-hybrid-execution.md](phase-3-hybrid-execution.md)
 - adaptive and benchmarking metadata compatibility from [phase-4-adaptive-dispatch.md](phase-4-adaptive-dispatch.md) and [phase-5-benchmarking-mode.md](phase-5-benchmarking-mode.md)
@@ -51,6 +52,7 @@ Phase 6 may rely only on stabilized earlier-phase contracts:
 - HiggsAgent must have a normalized coding-session abstraction distinct from the plain text completion path.
 - The coding-session abstraction must represent prompts, tool or action calls, file reads, file writes, command execution, and normalized failure output.
 - Repository mutations must remain inspectable through execution events and artifact references rather than hidden inside provider-specific payloads.
+- The detailed action and workflow rules are defined in [autonomous-coding-session-contract.md](autonomous-coding-session-contract.md).
 
 ### 2. Workspace Mutation And Validation
 

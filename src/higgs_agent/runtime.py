@@ -2,22 +2,65 @@
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import subprocess
-from dataclasses import replace
+import sys
+from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Iterable
 from uuid import uuid4
 
 from higgs_agent.application import DispatchOutcome, dispatch_next_ready_ticket
+from higgs_agent.events import EventStreamBuilder
 from higgs_agent.events.records import utc_now_iso
-from higgs_agent.providers.hosted import OpenRouterHTTPTransport
-from higgs_agent.providers.contract import ExecutorArtifactRef
-from higgs_agent.validation import ProposedFileChange
+from higgs_agent.providers.contract import ExecutorArtifactRef, ExecutorInput, ProviderExecutionResult
+from higgs_agent.providers.hosted import OpenRouterExecutor, OpenRouterHTTPTransport, load_executor_limits
+from higgs_agent.routing import choose_route, classify_ticket, load_route_guardrails
+from higgs_agent.tickets import TicketRecord, scan_ticket_directory, select_next_ready_ticket
+from higgs_agent.validation import (
+    ProposedFileChange,
+    ValidationDecision,
+    ValidationInput,
+    evaluate_write_request,
+    load_write_policy,
+)
 
 
 class RuntimeConfigError(ValueError):
     """Raised when runtime inputs are invalid or incomplete."""
+
+
+@dataclass(frozen=True, slots=True)
+class AutonomousFileWrite:
+    """Normalized full-file write requested by an autonomous session."""
+
+    path: str
+    content: str
+
+
+@dataclass(frozen=True, slots=True)
+class AutonomousPlan:
+    """Structured filesystem mutation plan returned by the coding model."""
+
+    summary: str
+    directories: tuple[str, ...]
+    writes: tuple[AutonomousFileWrite, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationCommandResult:
+    """Captured output from one configured validation command."""
+
+    command: str
+    exit_code: int
+    stdout: str
+    stderr: str
+
+    @property
+    def passed(self) -> bool:
+        return self.exit_code == 0
 
 
 def parse_changed_file_spec(spec: str) -> ProposedFileChange:
@@ -90,6 +133,172 @@ def run_ticketed_project(
     )
     if outcome is None:
         raise RuntimeConfigError(f"no ready tickets found in {tickets_dir}")
+    return persist_dispatch_outcome(repo_root=repo_root, outcome=outcome)
+
+
+def run_autonomous_ticket(
+    *,
+    repo_root: Path,
+    requirements_path: Path,
+    tickets_dir: Path,
+    guardrails_path: Path,
+    write_policy_path: Path,
+    validation_commands: tuple[str, ...],
+    openrouter_api_key: str,
+    owner: str = "coordinator",
+    muontickets_cli_path: Path | None = None,
+    transport=None,
+) -> DispatchOutcome:
+    """Execute one autonomous single-ticket coding session against the next ready ticket."""
+
+    if not validation_commands:
+        raise RuntimeConfigError("at least one validation command is required")
+
+    scan_result = scan_ticket_directory(tickets_dir)
+    ticket = select_next_ready_ticket(scan_result)
+    if ticket is None:
+        raise RuntimeConfigError(f"no ready tickets found in {tickets_dir}")
+
+    repo_root = repo_root.resolve()
+    requirements_text = requirements_path.read_text()
+    workspace_snapshot = _collect_workspace_snapshot(repo_root=repo_root, tickets_dir=tickets_dir)
+    mt_cli_path = muontickets_cli_path or _default_muontickets_cli(repo_root)
+    _require_file_exists(mt_cli_path, flag_name="--muontickets-cli")
+
+    _run_muontickets_command(mt_cli_path, ["claim", ticket.id, "--owner", owner], cwd=repo_root)
+
+    semantics = classify_ticket(ticket)
+    route_guardrails = load_route_guardrails(guardrails_path)
+    route = choose_route(semantics, route_guardrails, local_execution_enabled=False)
+
+    executor = OpenRouterExecutor(
+        limits=load_executor_limits(guardrails_path),
+        transport=transport or OpenRouterHTTPTransport(api_key=openrouter_api_key),
+    )
+    execution_input = ExecutorInput(
+        ticket_id=ticket.id,
+        run_id=f"run-{uuid4().hex[:12]}",
+        attempt_id="attempt-1",
+        route=route,
+        prompt=_build_autonomous_prompt(
+            ticket=ticket,
+            requirements_text=requirements_text,
+            workspace_snapshot=workspace_snapshot,
+        ),
+        system_prompt=(
+            "You are HiggsAgent autonomous coding runtime. "
+            "Return only a JSON object matching the requested schema."
+        ),
+        repo_head=_read_repo_head(repo_root),
+        allow_tool_calls=False,
+    )
+    execution_result = executor.execute(execution_input)
+    execution_result = _append_event(
+        execution_result,
+        event_type="prompt.rendered",
+        status="succeeded",
+        payload={"mode": "autonomous_ticket", "workspace_files": len(workspace_snapshot)},
+    )
+    execution_result = _append_event(
+        execution_result,
+        event_type="workspace.read",
+        status="succeeded",
+        payload={"paths": [item["path"] for item in workspace_snapshot]},
+    )
+
+    changed_files: tuple[ProposedFileChange, ...] = ()
+    validation_results: tuple[ValidationCommandResult, ...] = ()
+    if execution_result.status == "succeeded":
+        try:
+            plan = _parse_autonomous_plan(execution_result.output_text)
+            changed_files, execution_result = _apply_autonomous_plan(
+                repo_root=repo_root,
+                execution_result=execution_result,
+                plan=plan,
+            )
+        except RuntimeConfigError as exc:
+            execution_result = _mark_execution_failed(
+                execution_result,
+                error_kind="materialization_failure",
+                message=str(exc),
+            )
+
+    if execution_result.status == "succeeded":
+        validation_results, execution_result = _run_validation_commands(
+            repo_root=repo_root,
+            commands=validation_commands,
+            execution_result=execution_result,
+        )
+
+    validation_summary = _render_validation_summary(validation_results)
+    validation_decision = _evaluate_autonomous_write_request(
+        ticket=ticket,
+        execution_result=execution_result,
+        changed_files=changed_files,
+        validation_summary=validation_summary,
+        validation_passed=all(result.passed for result in validation_results) if validation_results else False,
+        write_policy_path=write_policy_path,
+    )
+
+    execution_result = _with_runtime_validation_events(
+        execution_result,
+        validation_decision=validation_decision,
+        validation_summary=validation_summary,
+    )
+
+    if execution_result.status == "succeeded" and validation_decision.decision != "rejected":
+        _run_muontickets_command(
+            mt_cli_path,
+            [
+                "comment",
+                ticket.id,
+                (
+                    f"Autonomous run completed. Validation decision: {validation_decision.decision}. "
+                    f"Changed paths: {', '.join(validation_decision.changed_paths) or 'none'}."
+                ),
+            ],
+            cwd=repo_root,
+        )
+        execution_result = _append_event(
+            execution_result,
+            event_type="ticket.workflow.updated",
+            status="succeeded",
+            payload={"action": "comment", "ticket_id": ticket.id},
+        )
+        _run_muontickets_command(mt_cli_path, ["set-status", ticket.id, "needs_review"], cwd=repo_root)
+        execution_result = _append_event(
+            execution_result,
+            event_type="ticket.workflow.updated",
+            status="succeeded",
+            payload={"action": "set-status", "from": "claimed", "to": "needs_review", "ticket_id": ticket.id},
+        )
+    else:
+        _run_muontickets_command(
+            mt_cli_path,
+            [
+                "comment",
+                ticket.id,
+                (
+                    f"Autonomous run blocked. Validation decision: {validation_decision.decision}. "
+                    f"Reason: {validation_decision.reason}."
+                ),
+            ],
+            cwd=repo_root,
+        )
+        execution_result = _append_event(
+            execution_result,
+            event_type="ticket.workflow.updated",
+            status="succeeded",
+            payload={"action": "comment", "ticket_id": ticket.id, "reason": validation_decision.reason},
+        )
+
+    outcome = DispatchOutcome(
+        ticket=ticket,
+        semantics=semantics,
+        route=route,
+        execution_result=execution_result,
+        validation_decision=validation_decision,
+    )
     return persist_dispatch_outcome(repo_root=repo_root, outcome=outcome)
 
 
@@ -204,3 +413,381 @@ def _append_ndjson_line(path: Path, record: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def _build_autonomous_prompt(
+    *,
+    ticket: TicketRecord,
+    requirements_text: str,
+    workspace_snapshot: tuple[dict[str, str], ...],
+) -> str:
+    workspace_sections = []
+    for item in workspace_snapshot:
+        workspace_sections.append(f"Path: {item['path']}\n```\n{item['content']}\n```")
+    workspace_text = "\n\n".join(workspace_sections) if workspace_sections else "No existing workspace files captured."
+    title = ticket.frontmatter.get("title", ticket.id)
+    body = ticket.body.strip() or "No additional ticket body."
+    return "\n\n".join(
+        [
+            f"Ticket: {ticket.id} - {title}",
+            f"Ticket details:\n{body}",
+            f"Project requirements:\n{requirements_text.strip()}",
+            (
+                "Current workspace snapshot:\n"
+                f"{workspace_text}"
+            ),
+            (
+                "Return only valid JSON with this shape: "
+                '{"summary": "short summary", "directories": ["relative/path"], '
+                '"writes": [{"path": "relative/file.py", "content": "full file contents"}]}'
+            ),
+            "Use repository-relative paths only. Do not include markdown fences outside JSON.",
+        ]
+    )
+
+
+def _collect_workspace_snapshot(
+    *,
+    repo_root: Path,
+    tickets_dir: Path,
+    max_files: int = 20,
+    max_chars_per_file: int = 6000,
+) -> tuple[dict[str, str], ...]:
+    snapshot: list[dict[str, str]] = []
+    ignored_roots = {repo_root / ".git", repo_root / ".higgs", tickets_dir.resolve()}
+    for path in sorted(repo_root.rglob("*")):
+        if len(snapshot) >= max_files:
+            break
+        if not path.is_file():
+            continue
+        if any(parent == ignored_root for ignored_root in ignored_roots for parent in [path, *path.parents]):
+            continue
+        try:
+            content = path.read_text()
+        except UnicodeDecodeError:
+            continue
+        snapshot.append(
+            {
+                "path": str(path.relative_to(repo_root)).replace("\\", "/"),
+                "content": content[:max_chars_per_file],
+            }
+        )
+    return tuple(snapshot)
+
+
+def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
+    payload = _extract_json_payload(output_text)
+    if not isinstance(payload, dict):
+        raise RuntimeConfigError("autonomous response must be a JSON object")
+    summary = payload.get("summary", "")
+    if not isinstance(summary, str):
+        raise RuntimeConfigError("autonomous response 'summary' must be a string")
+    raw_directories = payload.get("directories", [])
+    if raw_directories is None:
+        raw_directories = []
+    if not isinstance(raw_directories, list) or not all(isinstance(item, str) for item in raw_directories):
+        raise RuntimeConfigError("autonomous response 'directories' must be a list of strings")
+    raw_writes = payload.get("writes", payload.get("files", []))
+    if raw_writes is None:
+        raw_writes = []
+    if not isinstance(raw_writes, list):
+        raise RuntimeConfigError("autonomous response 'writes' must be a list")
+
+    writes: list[AutonomousFileWrite] = []
+    for raw_write in raw_writes:
+        if not isinstance(raw_write, dict):
+            raise RuntimeConfigError("autonomous response write entries must be objects")
+        path = raw_write.get("path")
+        content = raw_write.get("content")
+        if not isinstance(path, str) or not isinstance(content, str):
+            raise RuntimeConfigError("autonomous response writes require string 'path' and 'content'")
+        writes.append(AutonomousFileWrite(path=path, content=content))
+
+    return AutonomousPlan(summary=summary, directories=tuple(raw_directories), writes=tuple(writes))
+
+
+def _extract_json_payload(output_text: str) -> object:
+    text = output_text.strip()
+    if not text:
+        raise RuntimeConfigError("autonomous response was empty")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    fenced_start = text.find("```")
+    if fenced_start != -1:
+        fence_header_end = text.find("\n", fenced_start)
+        fenced_end = text.rfind("```")
+        if fence_header_end != -1 and fenced_end > fence_header_end:
+            candidate = text[fence_header_end + 1:fenced_end].strip()
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError as exc:
+            raise RuntimeConfigError(f"autonomous response did not contain valid JSON: {exc}") from exc
+    raise RuntimeConfigError("autonomous response did not contain a JSON object")
+
+
+def _apply_autonomous_plan(
+    *,
+    repo_root: Path,
+    execution_result: ProviderExecutionResult,
+    plan: AutonomousPlan,
+) -> tuple[tuple[ProposedFileChange, ...], ProviderExecutionResult]:
+    updated_result = execution_result
+    for directory in plan.directories:
+        relative_dir = _normalize_relative_path(directory)
+        (repo_root / relative_dir).mkdir(parents=True, exist_ok=True)
+        updated_result = _append_event(
+            updated_result,
+            event_type="directory.created",
+            status="succeeded",
+            payload={"path": str(relative_dir).replace("\\", "/")},
+        )
+
+    changed_files: list[ProposedFileChange] = []
+    for write in plan.writes:
+        relative_path = _normalize_relative_path(write.path)
+        absolute_path = repo_root / relative_path
+        absolute_path.parent.mkdir(parents=True, exist_ok=True)
+        before_content = absolute_path.read_text() if absolute_path.exists() else None
+        absolute_path.write_text(write.content)
+        if before_content == write.content:
+            continue
+        additions, deletions = _line_diff_stats(before_content or "", write.content)
+        changed_files.append(
+            ProposedFileChange(
+                path=str(relative_path).replace("\\", "/"),
+                additions=additions,
+                deletions=deletions,
+                is_binary=False,
+            )
+        )
+        updated_result = _append_event(
+            updated_result,
+            event_type="file.written",
+            status="succeeded",
+            payload={"path": str(relative_path).replace("\\", "/")},
+        )
+
+    return tuple(changed_files), updated_result
+
+
+def _line_diff_stats(before: str, after: str) -> tuple[int, int]:
+    additions = 0
+    deletions = 0
+    for line in difflib.ndiff(before.splitlines(), after.splitlines()):
+        if line.startswith("+ "):
+            additions += 1
+        elif line.startswith("- "):
+            deletions += 1
+    return additions, deletions
+
+
+def _run_validation_commands(
+    *,
+    repo_root: Path,
+    commands: tuple[str, ...],
+    execution_result: ProviderExecutionResult,
+) -> tuple[tuple[ValidationCommandResult, ...], ProviderExecutionResult]:
+    results: list[ValidationCommandResult] = []
+    updated_result = execution_result
+    for command in commands:
+        updated_result = _append_event(
+            updated_result,
+            event_type="command.started",
+            status="started",
+            payload={"command": command},
+        )
+        completed = subprocess.run(
+            command,
+            cwd=str(repo_root),
+            shell=True,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        result = ValidationCommandResult(
+            command=command,
+            exit_code=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
+        results.append(result)
+        updated_result = _append_event(
+            updated_result,
+            event_type="command.completed",
+            status="succeeded" if result.passed else "failed",
+            payload={
+                "command": command,
+                "exit_code": result.exit_code,
+                "stdout_preview": result.stdout[:200],
+                "stderr_preview": result.stderr[:200],
+            },
+        )
+    return tuple(results), updated_result
+
+
+def _render_validation_summary(results: tuple[ValidationCommandResult, ...]) -> str:
+    if not results:
+        return "no validation commands were executed"
+    parts = []
+    for result in results:
+        status = "passed" if result.passed else f"failed({result.exit_code})"
+        preview = (result.stdout or result.stderr).strip().splitlines()
+        preview_text = preview[0] if preview else "no output"
+        parts.append(f"{result.command}: {status} - {preview_text[:120]}")
+    return " | ".join(parts)
+
+
+def _evaluate_autonomous_write_request(
+    *,
+    ticket: TicketRecord,
+    execution_result: ProviderExecutionResult,
+    changed_files: tuple[ProposedFileChange, ...],
+    validation_summary: str,
+    validation_passed: bool,
+    write_policy_path: Path,
+) -> ValidationDecision:
+    if execution_result.status != "succeeded":
+        return ValidationDecision(
+            decision="rejected",
+            reason=execution_result.attempt_summary.get("error", {}).get("kind", "executor_failed"),
+            diagnostics=(str(execution_result.attempt_summary.get("error", {}).get("message", "executor failed")),),
+            changed_paths=tuple(change.path for change in changed_files),
+            requires_human_review=False,
+        )
+
+    return evaluate_write_request(
+        ValidationInput(
+            ticket_id=ticket.id,
+            run_id=execution_result.attempt_summary["run_id"],
+            attempt_id=execution_result.attempt_summary["attempt_id"],
+            executor_status=execution_result.status,
+            output_text=execution_result.output_text,
+            changed_files=changed_files,
+            validation_summary=validation_summary,
+            validation_passed=validation_passed,
+            usage=execution_result.usage,
+        ),
+        load_write_policy(write_policy_path),
+    )
+
+
+def _with_runtime_validation_events(
+    execution_result: ProviderExecutionResult,
+    *,
+    validation_decision: ValidationDecision,
+    validation_summary: str,
+) -> ProviderExecutionResult:
+    updated = _append_event(
+        execution_result,
+        event_type="validation.completed",
+        status="succeeded" if validation_decision.decision == "accepted" else "failed",
+        payload={
+            "decision": validation_decision.decision,
+            "reason": validation_decision.reason,
+            "summary": validation_summary,
+            "diagnostics": list(validation_decision.diagnostics),
+        },
+    )
+    return _append_event(
+        updated,
+        event_type="write_gate.decided",
+        status="succeeded" if validation_decision.decision == "accepted" else "failed",
+        payload={
+            "decision": validation_decision.decision,
+            "reason": validation_decision.reason,
+            "changed_paths": list(validation_decision.changed_paths),
+        },
+    )
+
+
+def _append_event(
+    execution_result: ProviderExecutionResult,
+    *,
+    event_type: str,
+    status: str,
+    payload: dict[str, object] | None = None,
+    error: dict[str, object] | None = None,
+) -> ProviderExecutionResult:
+    events = list(execution_result.events)
+    builder = EventStreamBuilder(
+        run_id=execution_result.attempt_summary["run_id"],
+        attempt_id=execution_result.attempt_summary["attempt_id"],
+        ticket_id=execution_result.attempt_summary["ticket_id"],
+        executor_version="phase-6",
+    )
+    builder._sequence = len(events)
+    builder.append(event_type, status, payload=payload, error=error)
+    events.extend(builder.build())
+    return replace(execution_result, events=tuple(events))
+
+
+def _mark_execution_failed(
+    execution_result: ProviderExecutionResult,
+    *,
+    error_kind: str,
+    message: str,
+) -> ProviderExecutionResult:
+    error = {"kind": error_kind, "message": message, "retryable": False}
+    updated_summary = dict(execution_result.attempt_summary)
+    updated_summary["final_result"] = "failed"
+    updated_summary["error"] = error
+    updated_result = replace(
+        execution_result,
+        status="failed",
+        attempt_summary=updated_summary,
+    )
+    return _append_event(
+        updated_result,
+        event_type="command.completed",
+        status="failed",
+        payload={"phase": "autonomous_materialization", "message": message},
+        error=error,
+    )
+
+
+def _normalize_relative_path(path_text: str) -> Path:
+    path = Path(path_text)
+    if path.is_absolute():
+        raise RuntimeConfigError(f"autonomous response path must be relative: {path_text}")
+    if any(part == ".." for part in path.parts):
+        raise RuntimeConfigError(f"autonomous response path must not escape repo root: {path_text}")
+    if not path.parts:
+        raise RuntimeConfigError("autonomous response path must not be empty")
+    return path
+
+
+def _default_muontickets_cli(repo_root: Path) -> Path:
+    return repo_root / "tickets" / "mt" / "muontickets" / "muontickets" / "mt.py"
+
+
+def _require_file_exists(path: Path, *, flag_name: str) -> Path:
+    if not path.exists():
+        raise FileNotFoundError(f"{flag_name} path not found: {path}")
+    if not path.is_file():
+        raise ValueError(f"{flag_name} must be a file: {path}")
+    return path
+
+
+def _run_muontickets_command(mt_cli_path: Path, args: Iterable[str], *, cwd: Path) -> str:
+    completed = subprocess.run(
+        [sys.executable, str(mt_cli_path), *args],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()
+        raise RuntimeConfigError(f"MuonTickets command failed: {detail or 'unknown error'}")
+    return completed.stdout.strip()

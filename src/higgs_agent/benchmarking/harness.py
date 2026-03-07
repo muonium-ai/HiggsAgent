@@ -78,6 +78,7 @@ def run_benchmark_workload(
     """Execute one workload across a declared candidate set."""
 
     _validate_workload(workload)
+    _validate_config(workload, config)
     _validate_candidates(workload, candidates)
 
     ticket_id = f"BENCH-{workload.workload_id}"
@@ -134,6 +135,13 @@ def _build_workload_prompt(workload: BenchmarkWorkload) -> str:
 def _validate_workload(workload: BenchmarkWorkload) -> None:
     if workload.requires_repository_write:
         raise BenchmarkHarnessError("benchmark workloads requiring repository writes are unsupported")
+
+
+def _validate_config(workload: BenchmarkWorkload, config: BenchmarkHarnessConfig) -> None:
+    if workload.ticket_shape.tool_profile == "none" and config.tools:
+        raise BenchmarkHarnessError(
+            "benchmark harness tools are unsupported when the workload tool profile is none"
+        )
 
 
 def _validate_candidates(

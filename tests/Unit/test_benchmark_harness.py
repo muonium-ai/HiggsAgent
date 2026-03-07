@@ -16,7 +16,12 @@ from higgs_agent.benchmarking import (
     run_benchmark_workload,
 )
 from higgs_agent.events.records import AttemptSummaryBuilder, EventStreamBuilder
-from higgs_agent.providers.contract import ExecutorInput, ProviderExecutionResult, ProviderUsage
+from higgs_agent.providers.contract import (
+    ExecutorInput,
+    ProviderExecutionResult,
+    ProviderToolDefinition,
+    ProviderUsage,
+)
 from higgs_agent.routing import RouteDecision
 
 
@@ -88,6 +93,35 @@ def test_benchmark_harness_rejects_incomparable_candidate_tool_requirements() ->
                 ),
             ),
             config=BenchmarkHarnessConfig(benchmark_id="bench-tools-1"),
+        )
+
+
+def test_benchmark_harness_rejects_configured_tools_for_toolless_workload() -> None:
+    workload = load_benchmark_workload_manifest().workloads[0]
+
+    with pytest.raises(
+        BenchmarkHarnessError,
+        match="tools are unsupported when the workload tool profile is none",
+    ):
+        run_benchmark_workload(
+            workload,
+            (
+                BenchmarkCandidate(
+                    "docs",
+                    _route(workload, "openrouter", "openai/gpt-4o-mini", "economy"),
+                    FakeExecutor(_result_for),
+                ),
+            ),
+            config=BenchmarkHarnessConfig(
+                benchmark_id="bench-tools-2",
+                tools=(
+                    ProviderToolDefinition(
+                        name="read_ticket",
+                        description="Read ticket context",
+                        parameters={"type": "object"},
+                    ),
+                ),
+            ),
         )
 
 

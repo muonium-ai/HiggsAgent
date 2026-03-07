@@ -109,7 +109,15 @@ uv run higgs-agent run autonomous-ticket \
 	--validation-command "uv run pytest"
 ```
 
-The current implementation supports one ready ticket per invocation and bounded directory creation plus full-file writes from the structured OpenRouter response. Broader patch and diff materialization remains a later follow-up.
+The current implementation supports one ready ticket per invocation and the following structured materialization formats from the OpenRouter response:
+
+- repository-relative `directories` plus `writes` or `files` entries for initial scaffold creation
+- nested `scaffold.tree` entries with `type=directory` and `type=file`
+- repository-relative `patches` or `diffs` entries that replace one exact matched snippet in an existing file
+
+The runtime does not yet support arbitrary unified diffs, fuzzy patch application, or multi-step tool-driven editing. Unsupported or ambiguous materialization instructions fail safely and are recorded as blocked autonomous outcomes.
+
+Autonomous materialization artifacts now include `materialization-plan.json` alongside `output.txt` and any `review-handoff.txt` artifact when applicable.
 
 Autonomous telemetry is written under `.higgs/local/` and includes:
 

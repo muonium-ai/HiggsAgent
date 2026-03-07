@@ -1,0 +1,14 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "{\"summary\": \"Updated protected file\", \"directories\": [], \"writes\": [{\"path\": \"pyproject.toml\", \"content\": \"[project]\\nname = \\\"game-of-life\\\"\\n\"}]}"
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 24,
+    "total_tokens": 36
+  }
+}

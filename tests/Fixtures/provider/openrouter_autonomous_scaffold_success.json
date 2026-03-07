@@ -1,0 +1,14 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "{\"summary\": \"Created initial scaffold\", \"directories\": [\"src/game_of_life\", \"tests\"], \"writes\": [{\"path\": \"src/game_of_life/__init__.py\", \"content\": \"\\\"\\\"\\\"Game of Life.\\\"\\\"\\\"\\n\"}, {\"path\": \"tests/test_scaffold.py\", \"content\": \"def test_placeholder():\\n    assert True\\n\"}]}"
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 20,
+    "total_tokens": 30
+  }
+}

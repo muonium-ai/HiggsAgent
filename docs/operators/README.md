@@ -14,6 +14,7 @@ The supported installed operator surface lives under `uv run higgs-agent ...`.
 
 - [runbook.md](runbook.md)
 - [autonomous-ticket.md](autonomous-ticket.md)
+- [turnkey-project.md](turnkey-project.md)
 - [dispatcher.md](dispatcher.md)
 - [adaptive-dispatch.md](adaptive-dispatch.md)
 - [benchmarking.md](benchmarking.md)
@@ -35,6 +36,7 @@ The supported installed operator surface lives under `uv run higgs-agent ...`.
 - retention or redaction rules change
 - hosted versus local execution behavior changes
 - autonomous single-ticket execution behavior or operator inputs change
+- turnkey project-build behavior, stop conditions, or review flow change
 - adaptive scoring behavior, review expectations, or rollout guidance changes
 - benchmarking methodology, interpretation limits, or public review expectations change
 - dispatcher execution or review workflow changes

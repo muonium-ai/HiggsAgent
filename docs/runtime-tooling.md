@@ -66,6 +66,7 @@ The current runtime surfaces are:
 - `uv run higgs-agent analytics report ...`
 - `uv run higgs-agent run ticketed-project ...`
 - `uv run higgs-agent run autonomous-ticket ...`
+- `uv run higgs-agent run turnkey-project ...`
 
 ## Initial Supported Environment
 
@@ -117,6 +118,29 @@ Autonomous telemetry is written under `.higgs/local/` and includes:
 - `.higgs/local/analytics/attempt-summaries.ndjson`
 
 Blocked or review-required runs may emit `review-handoff.txt` in the attempt artifacts directory.
+
+## Phase 7 Turnkey Project Runtime Surface
+
+Phase 7 adds a bounded project-level loop on top of the shipped single-ticket autonomous runtime.
+
+- The runtime reuses `run_autonomous_ticket(...)` instead of duplicating the coding loop.
+- Project runs persist checkpoint, summary, and review-bundle artifacts under `.higgs/local/project-runs/<project_run_id>/`.
+- Operators can control `project_run_id`, resume behavior, maximum attempted tickets, and maximum consecutive runtime failures through the CLI.
+- The current explicit commit policy is `disabled`; local commit creation is not yet implemented.
+
+The currently shipped command shape is:
+
+```bash
+uv run higgs-agent run turnkey-project \
+	--repo-root . \
+	--requirements docs/architecture.md \
+	--tickets-dir tickets \
+	--guardrails config/guardrails.example.json \
+	--write-policy config/write-policy.example.json \
+	--validation-command "uv run pytest tests" \
+	--max-tickets 5 \
+	--max-consecutive-failures 2
+```
 
 ## Hybrid Operational Limits
 

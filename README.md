@@ -1,10 +1,10 @@
 # HiggsAgent
 
-HiggsAgent is a Git-native autonomous agent dispatcher that routes work based on structured ticket semantics, can now execute one autonomous coding ticket at a time, and records execution decisions in a white-box, inspectable way.
+HiggsAgent is a Git-native autonomous agent dispatcher that routes work based on structured ticket semantics, can now execute one autonomous coding ticket or a bounded project-wide ticket graph, and records execution decisions in a white-box, inspectable way.
 
 ## Status
 
-The repository is currently through the first Phase 6 autonomous single-ticket milestone. The runtime now includes deterministic hosted and local route selection, bounded fallback behavior, normalized observability, analytics reporting, adaptive telemetry ingestion, explainable adaptive scoring surfaces, curated benchmark workloads, comparable benchmark execution, benchmark ranking outputs, write-gate validation, and an OpenRouter-backed autonomous single-ticket execution surface.
+The repository is currently through the first Phase 7 turnkey-project milestone. The runtime now includes deterministic hosted and local route selection, bounded fallback behavior, normalized observability, analytics reporting, adaptive telemetry ingestion, explainable adaptive scoring surfaces, curated benchmark workloads, comparable benchmark execution, benchmark ranking outputs, write-gate validation, an OpenRouter-backed autonomous single-ticket execution surface, and a bounded turnkey-project orchestration loop with checkpoints and review bundles.
 
 ## Runtime Model
 
@@ -39,9 +39,10 @@ The repository is currently through the first Phase 6 autonomous single-ticket m
 
 5. Review the runtime contract in [docs/runtime-tooling.md](docs/runtime-tooling.md).
 6. Review the operator guide for autonomous single-ticket execution in [docs/operators/autonomous-ticket.md](docs/operators/autonomous-ticket.md).
-7. If you want to use HiggsAgent patterns in a fresh repository, start with [docs/adopters/new-project-quickstart.md](docs/adopters/new-project-quickstart.md).
-8. Review the benchmark methodology contract in [docs/phase-5-benchmarking-mode.md](docs/phase-5-benchmarking-mode.md) and the operator, contributor, and adopter guides under [docs/operators](docs/operators), [docs/contributors](docs/contributors), and [docs/adopters](docs/adopters).
-9. Use `make help` for the documented task surface.
+7. Review the operator guide for bounded project-wide builds in [docs/operators/turnkey-project.md](docs/operators/turnkey-project.md).
+8. If you want to use HiggsAgent patterns in a fresh repository, start with [docs/adopters/new-project-quickstart.md](docs/adopters/new-project-quickstart.md).
+9. Review the benchmark methodology contract in [docs/phase-5-benchmarking-mode.md](docs/phase-5-benchmarking-mode.md) and the operator, contributor, and adopter guides under [docs/operators](docs/operators), [docs/contributors](docs/contributors), and [docs/adopters](docs/adopters).
+10. Use `make help` for the documented task surface.
 
 ## Repository Guides
 

@@ -6,7 +6,7 @@ Operators and reviewers handling HiggsAgent execution runs.
 
 ## Purpose
 
-Summarize the safe operating model for the shipped review-mode and autonomous single-ticket runtimes.
+Summarize the safe operating model for the shipped review-mode, autonomous single-ticket, and bounded turnkey-project runtimes.
 
 ## Operating Rules
 
@@ -24,6 +24,7 @@ Operators should use the installed HiggsAgent CLI from the repository environmen
 - `uv run higgs-agent bootstrap sample-project ...`
 - `uv run higgs-agent run ticketed-project ...`
 - `uv run higgs-agent run autonomous-ticket ...`
+- `uv run higgs-agent run turnkey-project ...`
 
 ## Autonomous Single-Ticket Checklist
 
@@ -36,6 +37,18 @@ Before running the autonomous surface, confirm all of the following:
 - the validation commands you pass are the commands you want HiggsAgent to treat as the write-gate evidence source
 
 Use [autonomous-ticket.md](autonomous-ticket.md) for the full command example, telemetry locations, and review expectations.
+
+## Turnkey Project Checklist
+
+Before running the full-project surface, confirm all of the following:
+
+- the board validates cleanly and the repository actually contains executable ready tickets or a resumable checkpoint
+- your requirements file gives enough scope for the repository graph rather than a single ticket
+- your chosen `--max-tickets` and `--max-consecutive-failures` values reflect how much unattended execution you want to allow
+- you understand the current project-level commit policy is `disabled`
+- you know where the project checkpoint, summary, and review-bundle files will be written under `.higgs/local/project-runs/`
+
+Use [turnkey-project.md](turnkey-project.md) for the full command shape, terminal conditions, resume flow, and review bundle expectations.
 
 ## Normative Sources
 
@@ -55,3 +68,4 @@ Use [autonomous-ticket.md](autonomous-ticket.md) for the full command example, t
 - write boundaries change
 - execution artifact handling changes
 - autonomous operator prerequisites or review flow change
+- turnkey-project operator prerequisites or recovery flow change

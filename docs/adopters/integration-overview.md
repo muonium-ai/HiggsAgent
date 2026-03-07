@@ -6,7 +6,7 @@ Repository owners evaluating HiggsAgent adoption.
 
 ## Purpose
 
-Describe the high-level integration shape without assuming later runtime phases already exist.
+Describe the high-level integration shape for repositories adopting HiggsAgent, including the currently shipped single-ticket and turnkey-project autonomous surfaces.
 
 ## Recommended Adoption Order
 
@@ -42,7 +42,28 @@ Current limits matter:
 - HiggsAgent completes one dependency-unblocked ready ticket per invocation.
 - The runtime currently materializes bounded directory creation and full-file writes from structured OpenRouter JSON.
 - Review remains mandatory after `needs_review`; HiggsAgent does not auto-complete the ticket to `done`.
-- Project-wide autonomous completion remains a later phase.
+
+## Turnkey Project Adoption
+
+HiggsAgent can now attempt a bounded end-to-end repository build by repeatedly invoking the single-ticket runtime across the project graph.
+
+Recommended setup for a separate repository:
+
+1. Add HiggsAgent to the repository and sync the `uv` environment.
+2. Install or vendor MuonTickets under `tickets/mt/muontickets`.
+3. Create repository-specific guardrails and write-policy JSON files.
+4. Create a project-level requirements or architecture file that gives the runtime enough scope for the ticket graph.
+5. Validate the board with `uv run higgs-agent validate tickets`.
+6. Run `uv run higgs-agent run turnkey-project ...` with explicit validation commands and explicit stop-condition bounds.
+7. Review `.higgs/local/project-runs/<project_run_id>/review-bundle.json` together with the changed files and per-attempt artifacts before merging.
+8. Resume only with the same `project_run_id` after you understand why the previous run stopped.
+
+Current limits matter:
+
+- The runtime is bounded by explicit stop conditions rather than unlimited project loops.
+- Project-level commit creation is not implemented; `--create-local-commit` is rejected.
+- Review remains mandatory after `needs_review`; HiggsAgent does not auto-complete the ticket graph to `done`.
+- The underlying coding loop still supports only the currently shipped structured materialization formats.
 
 ## For New Repositories
 

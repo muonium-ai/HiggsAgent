@@ -28,6 +28,8 @@
 2. Phase 3 hybrid hosted and local execution epic: `T-000019`.
 3. Phase 4 adaptive dispatch epic: `T-000020`.
 4. Phase 5 benchmarking mode epic: `T-000021`.
+5. Phase 6 autonomous ticket execution epic: `T-000053`.
+6. Phase 7 turnkey project build epic: `T-000058`.
 
 ## Ticket Creation Rules
 

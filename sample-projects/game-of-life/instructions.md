@@ -251,6 +251,23 @@ Only after the single-agent baseline is stable should you move to a coordinator-
 
 ## Step 7: Exact Instructions To Give The Agent
 
+If you want a first-party HiggsAgent execution surface instead of driving the run entirely through an external prompt UI, use `higgs-agent run ticketed-project` with explicit repository inputs, a declared proposed change set, and a validation summary.
+
+Template:
+
+```bash
+uv run --directory tools/higgsagent higgs-agent run ticketed-project \
+  --repo-root . \
+  --requirements sample-projects/game-of-life/requirements.md \
+  --tickets-dir sample-projects/game-of-life/tickets \
+  --guardrails tools/higgsagent/config/guardrails.example.json \
+  --write-policy tools/higgsagent/config/write-policy.example.json \
+  --changed-file src/game_of_life/board.py:40:0 \
+  --validation-summary "pytest tests/Unit passed for board model slice"
+```
+
+This command runs the existing deterministic dispatcher pipeline for the next ready ticket. It does not infer repository mutations for you; the proposed change set and validation summary are explicit inputs to the write gate.
+
 Give the coding agent a prompt like this:
 
 ```text

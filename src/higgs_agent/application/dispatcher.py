@@ -39,6 +39,7 @@ def dispatch_next_ready_ticket(
     run_id: str = "run-1",
     attempt_id: str = "attempt-1",
     repo_head: str | None = None,
+    requirements_text: str | None = None,
 ) -> DispatchOutcome | None:
     """Run the deterministic hybrid dispatcher pipeline for the next ready ticket."""
 
@@ -64,7 +65,7 @@ def dispatch_next_ready_ticket(
         run_id=run_id,
         attempt_id=attempt_id,
         route=route,
-        prompt=_build_prompt(ticket),
+        prompt=_build_prompt(ticket, requirements_text=requirements_text),
         system_prompt="You are HiggsAgent.",
         repo_head=repo_head,
         allow_tool_calls=route.requires_tool_calls,
@@ -122,12 +123,17 @@ def dispatch_next_ready_ticket(
     )
 
 
-def _build_prompt(ticket: TicketRecord) -> str:
+def _build_prompt(ticket: TicketRecord, *, requirements_text: str | None = None) -> str:
     title = ticket.frontmatter.get("title", ticket.id)
     body = ticket.body.strip()
+    sections: list[str] = []
+    if requirements_text and requirements_text.strip():
+        sections.append(f"Project requirements:\n\n{requirements_text.strip()}")
+    sections.append(str(title))
     if not body:
-        return str(title)
-    return f"{title}\n\n{body}"
+        return "\n\n".join(sections)
+    sections.append(body)
+    return "\n\n".join(sections)
 
 
 def _executor_for_route(

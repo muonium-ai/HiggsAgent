@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
 from typing import Protocol
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from higgs_agent.events import AttemptSummaryBuilder, EventStreamBuilder
 from higgs_agent.providers.contract import (
@@ -39,6 +41,36 @@ class OpenRouterExecutorError(ValueError):
 
 
 OpenRouterExecutionResult = ProviderExecutionResult
+
+
+@dataclass(slots=True)
+class OpenRouterHTTPTransport:
+    """Minimal HTTP transport for OpenRouter chat completions."""
+
+    api_key: str
+    base_url: str = "https://openrouter.ai/api/v1"
+
+    def complete(self, payload: dict[str, object], timeout_ms: int) -> dict[str, object]:
+        request = Request(
+            url=f"{self.base_url.rstrip('/')}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=timeout_ms / 1000) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"OpenRouter HTTP {exc.code}: {detail or exc.reason}") from exc
+        except URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            if isinstance(reason, TimeoutError):
+                raise TimeoutError("OpenRouter request timed out") from exc
+            raise RuntimeError(f"OpenRouter request failed: {reason}") from exc
 
 
 def load_executor_limits(config_path: Path) -> ExecutorLimits:

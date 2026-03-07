@@ -26,13 +26,14 @@ This remains the baseline execution model even though later phases added analyti
 
 ## Current Runtime Surface
 
-The dispatcher is currently a library-first runtime surface, not a public dispatch CLI.
+The dispatcher now has a first-party CLI entrypoint for explicit review-mode runs.
 
 - Analytics reporting is exposed through the `higgs-agent analytics report` command.
-- Dispatcher execution itself is exposed through `higgs_agent.application.dispatch_next_ready_ticket`.
-- Integration tests show the supported orchestration boundary for the current runtime.
+- Sample-project bootstrap is exposed through `higgs-agent bootstrap sample-project`.
+- Ticketed dispatcher execution is exposed through `higgs-agent run ticketed-project`.
+- The library entrypoint remains available as `higgs_agent.application.dispatch_next_ready_ticket` for integration tests and lower-level orchestration.
 
-Operators should not assume there is a stable top-level `dispatch` command yet. The current product contract is still centered on explicit Python surfaces and validated configuration files.
+The `run ticketed-project` command is intentionally explicit. Operators must still supply the requirement file, ticket directory, guardrails file, write-policy file, and a declared proposed change set plus validation summary.
 
 ## Configuration Inputs
 

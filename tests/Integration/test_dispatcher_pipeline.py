@@ -58,6 +58,31 @@ def test_dispatcher_pipeline_accepts_clean_allowed_changes(tmp_path: Path) -> No
     assert transport.calls
 
 
+def test_dispatcher_pipeline_includes_requirements_text_in_provider_prompt(tmp_path: Path) -> None:
+    tickets_dir = _write_ticket_fixture(tmp_path, "tickets/dispatcher_ready_docs.md")
+    transport = FakeTransport([load_json_fixture("provider/openrouter_success_minimal.json")])
+
+    outcome = dispatch_next_ready_ticket(
+        tickets_dir,
+        transport=transport,
+        guardrails_path=Path("config/guardrails.example.json"),
+        write_policy_path=Path("config/write-policy.example.json"),
+        planned_changes=(
+            ProposedFileChange(path="docs/operators/runbook.md", additions=4, deletions=0),
+        ),
+        validation_summary="dispatcher pipeline succeeded",
+        requirements_text="# Requirements\nKeep the implementation reproducible.",
+    )
+
+    assert outcome is not None
+    payload, _timeout_ms = transport.calls[0]
+    user_message = payload["messages"][-1]["content"]
+    assert "Project requirements:" in user_message
+    assert "Keep the implementation reproducible." in user_message
+    assert "Dispatcher docs fixture" in user_message
+    assert "Exercise the deterministic dispatcher integration path for a docs ticket." in user_message
+
+
 def test_dispatcher_pipeline_requires_handoff_for_protected_paths(tmp_path: Path) -> None:
     tickets_dir = _write_ticket_fixture(tmp_path, "tickets/dispatcher_ready_code.md")
     transport = FakeTransport([load_json_fixture("provider/openrouter_success_minimal.json")])

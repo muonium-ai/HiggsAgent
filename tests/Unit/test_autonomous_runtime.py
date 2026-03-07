@@ -235,10 +235,14 @@ def test_run_turnkey_project_reuses_single_ticket_runtime_and_persists_checkpoin
     assert result.status == "succeeded"
     assert result.terminal_condition == "no_ready_ticket"
     assert result.completed_tickets == ("T-000201", "T-000202")
+    assert result.retry_count == 0
+    assert result.commit_policy == "disabled"
     checkpoint = json.loads(result.checkpoint_path.read_text())
     assert checkpoint["completed_tickets"] == ["T-000201", "T-000202"]
     summary = json.loads(result.summary_path.read_text())
     assert summary["terminal_condition"] == "no_ready_ticket"
+    bundle = json.loads(result.review_bundle_path.read_text())
+    assert bundle["completed_tickets"] == ["T-000201", "T-000202"]
 
 
 def test_run_turnkey_project_resume_appends_to_existing_checkpoint(
@@ -319,6 +323,166 @@ def test_run_turnkey_project_resume_appends_to_existing_checkpoint(
     checkpoint = json.loads(result.checkpoint_path.read_text())
     assert checkpoint["resumed"] is True
     assert checkpoint["completed_tickets"] == ["T-000201", "T-000202"]
+
+
+def test_run_turnkey_project_stops_on_max_ticket_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = tmp_path / "guardrails.json"
+    write_policy_path = tmp_path / "write-policy.json"
+    mt_cli_path = tmp_path / "mt.py"
+
+    requirements_path.write_text("Build the sample app.\n")
+    guardrails_path.write_text(Path("config/guardrails.example.json").read_text())
+    write_policy_path.write_text(Path("config/write-policy.example.json").read_text())
+    mt_cli_path.write_text("print('ok')\n")
+
+    outcomes = [_project_outcome(ticket_id="T-000201", decision="accepted")]
+
+    def fake_run_autonomous_ticket(**kwargs):
+        return outcomes.pop(0)
+
+    monkeypatch.setattr(runtime, "run_autonomous_ticket", fake_run_autonomous_ticket)
+
+    result = runtime.run_turnkey_project(
+        repo_root=repo_root,
+        requirements_path=requirements_path,
+        tickets_dir=tickets_dir,
+        guardrails_path=guardrails_path,
+        write_policy_path=write_policy_path,
+        validation_commands=("uv run pytest tests",),
+        openrouter_api_key="test-key",
+        muontickets_cli_path=mt_cli_path,
+        max_tickets=1,
+    )
+
+    assert result.status == "stopped"
+    assert result.terminal_condition == "max_ticket_limit_reached"
+
+
+def test_run_turnkey_project_stops_after_repeated_runtime_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = tmp_path / "guardrails.json"
+    write_policy_path = tmp_path / "write-policy.json"
+    mt_cli_path = tmp_path / "mt.py"
+
+    requirements_path.write_text("Build the sample app.\n")
+    guardrails_path.write_text(Path("config/guardrails.example.json").read_text())
+    write_policy_path.write_text(Path("config/write-policy.example.json").read_text())
+    mt_cli_path.write_text("print('ok')\n")
+
+    def fake_run_autonomous_ticket(**kwargs):
+        raise runtime.RuntimeConfigError("provider transport failed")
+
+    monkeypatch.setattr(runtime, "run_autonomous_ticket", fake_run_autonomous_ticket)
+
+    result = runtime.run_turnkey_project(
+        repo_root=repo_root,
+        requirements_path=requirements_path,
+        tickets_dir=tickets_dir,
+        guardrails_path=guardrails_path,
+        write_policy_path=write_policy_path,
+        validation_commands=("uv run pytest tests",),
+        openrouter_api_key="test-key",
+        muontickets_cli_path=mt_cli_path,
+        max_consecutive_failures=2,
+    )
+
+    assert result.status == "blocked"
+    assert result.terminal_condition == "repeated_failures_exceeded"
+    assert result.retry_count == 2
+    bundle = json.loads(result.review_bundle_path.read_text())
+    assert bundle["commit_policy"] == "disabled"
+
+
+def test_run_turnkey_project_detects_blocked_dependency_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = tmp_path / "guardrails.json"
+    write_policy_path = tmp_path / "write-policy.json"
+    mt_cli_path = tmp_path / "mt.py"
+
+    requirements_path.write_text("Build the sample app.\n")
+    guardrails_path.write_text(Path("config/guardrails.example.json").read_text())
+    write_policy_path.write_text(Path("config/write-policy.example.json").read_text())
+    mt_cli_path.write_text("print('ok')\n")
+    (tickets_dir / "T-000300.md").write_text(
+        "---\n"
+        "id: T-000300\n"
+        "title: Blocked task\n"
+        "status: ready\n"
+        "priority: p1\n"
+        "type: code\n"
+        "effort: s\n"
+        "higgs_schema_version: 1\n"
+        "higgs_platform: agnostic\n"
+        "higgs_execution_target: hosted\n"
+        "higgs_tool_profile: none\n"
+        "depends_on: [T-999999]\n"
+        "---\n\n"
+        "Blocked by missing dependency.\n"
+    )
+
+    def fake_run_autonomous_ticket(**kwargs):
+        raise runtime.RuntimeConfigError(f"no ready tickets found in {tickets_dir}")
+
+    monkeypatch.setattr(runtime, "run_autonomous_ticket", fake_run_autonomous_ticket)
+
+    result = runtime.run_turnkey_project(
+        repo_root=repo_root,
+        requirements_path=requirements_path,
+        tickets_dir=tickets_dir,
+        guardrails_path=guardrails_path,
+        write_policy_path=write_policy_path,
+        validation_commands=("uv run pytest tests",),
+        openrouter_api_key="test-key",
+        muontickets_cli_path=mt_cli_path,
+    )
+
+    assert result.status == "blocked"
+    assert result.terminal_condition == "blocked_dependency_graph"
+
+
+def test_run_turnkey_project_rejects_unsupported_local_commit_request(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = tmp_path / "guardrails.json"
+    write_policy_path = tmp_path / "write-policy.json"
+
+    requirements_path.write_text("Build the sample app.\n")
+    guardrails_path.write_text(Path("config/guardrails.example.json").read_text())
+    write_policy_path.write_text(Path("config/write-policy.example.json").read_text())
+
+    with pytest.raises(runtime.RuntimeConfigError, match="local commit creation is not yet supported"):
+        runtime.run_turnkey_project(
+            repo_root=repo_root,
+            requirements_path=requirements_path,
+            tickets_dir=tickets_dir,
+            guardrails_path=guardrails_path,
+            write_policy_path=write_policy_path,
+            validation_commands=("uv run pytest tests",),
+            openrouter_api_key="test-key",
+            create_local_commit=True,
+        )
 
 
 def _project_outcome(*, ticket_id: str, decision: str):

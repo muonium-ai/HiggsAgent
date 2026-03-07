@@ -134,6 +134,9 @@ def _build_parser() -> argparse.ArgumentParser:
     run_turnkey_project_parser.add_argument("--muontickets-cli", type=Path)
     run_turnkey_project_parser.add_argument("--project-run-id")
     run_turnkey_project_parser.add_argument("--resume", action="store_true")
+    run_turnkey_project_parser.add_argument("--max-tickets", type=int)
+    run_turnkey_project_parser.add_argument("--max-consecutive-failures", type=int, default=1)
+    run_turnkey_project_parser.add_argument("--create-local-commit", action="store_true")
     run_turnkey_project_parser.add_argument("--openrouter-api-key")
 
     validate_tickets_parser = validate_subparsers.add_parser("tickets")
@@ -339,6 +342,9 @@ def _run_turnkey_project(args: argparse.Namespace) -> None:
             muontickets_cli_path=muontickets_cli_path,
             project_run_id=args.project_run_id,
             resume=args.resume,
+            max_tickets=args.max_tickets,
+            max_consecutive_failures=args.max_consecutive_failures,
+            create_local_commit=args.create_local_commit,
             openrouter_api_key=openrouter_api_key,
         )
     except (FileNotFoundError, RuntimeConfigError, ValueError) as exc:
@@ -348,10 +354,13 @@ def _run_turnkey_project(args: argparse.Namespace) -> None:
     print(f"status: {outcome.status}")
     print(f"terminal_condition: {outcome.terminal_condition}")
     print(f"resumed: {str(outcome.resumed).lower()}")
+    print(f"retry_count: {outcome.retry_count}")
+    print(f"commit_policy: {outcome.commit_policy}")
     print(f"attempted_tickets: {', '.join(ticket.ticket_id for ticket in outcome.attempted_tickets) or 'none'}")
     print(f"completed_tickets: {', '.join(outcome.completed_tickets) or 'none'}")
     print(f"checkpoint_path: {outcome.checkpoint_path.relative_to(repo_root)}")
     print(f"summary_path: {outcome.summary_path.relative_to(repo_root)}")
+    print(f"review_bundle_path: {outcome.review_bundle_path.relative_to(repo_root)}")
 
 
 def _run_validate_tickets(args: argparse.Namespace) -> None:

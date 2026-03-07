@@ -82,10 +82,13 @@ class ProjectRunResult:
     status: str
     terminal_condition: str
     resumed: bool
+    retry_count: int
+    commit_policy: str
     attempted_tickets: tuple[ProjectTicketAttempt, ...]
     completed_tickets: tuple[str, ...]
     checkpoint_path: Path
     summary_path: Path
+    review_bundle_path: Path
 
 
 def run_turnkey_project(
@@ -101,17 +104,27 @@ def run_turnkey_project(
     muontickets_cli_path: Path | None = None,
     project_run_id: str | None = None,
     resume: bool = False,
+    max_tickets: int | None = None,
+    max_consecutive_failures: int = 1,
+    create_local_commit: bool = False,
 ) -> ProjectRunResult:
     """Execute autonomous ticket runs until the repository reaches a terminal condition."""
 
     if not validation_commands:
         raise RuntimeConfigError("at least one validation command is required")
+    if max_tickets is not None and max_tickets <= 0:
+        raise RuntimeConfigError("max_tickets must be positive when provided")
+    if max_consecutive_failures <= 0:
+        raise RuntimeConfigError("max_consecutive_failures must be positive")
+    if create_local_commit:
+        raise RuntimeConfigError("turnkey-project local commit creation is not yet supported")
 
     repo_root = repo_root.resolve()
     run_id = project_run_id or f"project-run-{uuid4().hex[:12]}"
     run_dir = repo_root / ".higgs" / "local" / "project-runs" / run_id
     checkpoint_path = run_dir / "checkpoint.json"
     summary_path = run_dir / "summary.json"
+    review_bundle_path = run_dir / "review-bundle.json"
 
     if resume:
         state = _load_project_run_state(checkpoint_path=checkpoint_path, expected_project_run_id=run_id)
@@ -129,12 +142,27 @@ def run_turnkey_project(
             "status": "running",
             "terminal_condition": None,
             "resumed": False,
+            "retry_count": 0,
+            "consecutive_failures": 0,
+            "commit_policy": "disabled",
+            "max_tickets": max_tickets,
+            "max_consecutive_failures": max_consecutive_failures,
             "attempted_tickets": [],
             "completed_tickets": [],
         }
     _save_project_run_state(checkpoint_path, state)
 
     while True:
+        if max_tickets is not None and len(state["attempted_tickets"]) >= max_tickets:
+            return _finalize_project_run(
+                state,
+                checkpoint_path=checkpoint_path,
+                summary_path=summary_path,
+                review_bundle_path=review_bundle_path,
+                tickets_dir=tickets_dir,
+                status="stopped",
+                terminal_condition="max_ticket_limit_reached",
+            )
         try:
             outcome = run_autonomous_ticket(
                 repo_root=repo_root,
@@ -149,13 +177,43 @@ def run_turnkey_project(
             )
         except RuntimeConfigError as exc:
             if "no ready tickets found" not in str(exc):
-                raise
-            state["terminal_condition"] = "no_ready_ticket"
-            state["status"] = "succeeded"
-            state["updated_at"] = utc_now_iso()
-            _save_project_run_state(checkpoint_path, state)
-            _save_project_run_summary(summary_path, state)
-            return _build_project_run_result(state, checkpoint_path=checkpoint_path, summary_path=summary_path)
+                attempted_tickets = list(state["attempted_tickets"])
+                attempted_tickets.append(
+                    {
+                        "ticket_id": "(runtime)",
+                        "execution_status": "failed",
+                        "validation_decision": "rejected",
+                        "validation_reason": str(exc),
+                        "telemetry_paths": {},
+                    }
+                )
+                state["attempted_tickets"] = attempted_tickets
+                state["retry_count"] = int(state["retry_count"]) + 1
+                state["consecutive_failures"] = int(state["consecutive_failures"]) + 1
+                state["updated_at"] = utc_now_iso()
+                _save_project_run_state(checkpoint_path, state)
+                if int(state["consecutive_failures"]) >= max_consecutive_failures:
+                    return _finalize_project_run(
+                        state,
+                        checkpoint_path=checkpoint_path,
+                        summary_path=summary_path,
+                        review_bundle_path=review_bundle_path,
+                        tickets_dir=tickets_dir,
+                        status="blocked",
+                        terminal_condition="repeated_failures_exceeded",
+                    )
+                continue
+            terminal_condition = _determine_no_ready_terminal_condition(tickets_dir)
+            status = "blocked" if terminal_condition == "blocked_dependency_graph" else "succeeded"
+            return _finalize_project_run(
+                state,
+                checkpoint_path=checkpoint_path,
+                summary_path=summary_path,
+                review_bundle_path=review_bundle_path,
+                tickets_dir=tickets_dir,
+                status=status,
+                terminal_condition=terminal_condition,
+            )
 
         attempt_record = {
             "ticket_id": outcome.ticket.id,
@@ -172,20 +230,63 @@ def run_turnkey_project(
             completed_tickets = list(state["completed_tickets"])
             completed_tickets.append(outcome.ticket.id)
             state["completed_tickets"] = completed_tickets
+            state["consecutive_failures"] = 0
             state["updated_at"] = utc_now_iso()
             _save_project_run_state(checkpoint_path, state)
             continue
 
-        state["terminal_condition"] = (
-            "review_handoff_required"
-            if outcome.validation_decision.decision == "handoff_required"
-            else "ticket_rejected"
+        terminal_condition = _terminal_condition_for_outcome(outcome.validation_decision)
+        return _finalize_project_run(
+            state,
+            checkpoint_path=checkpoint_path,
+            summary_path=summary_path,
+            review_bundle_path=review_bundle_path,
+            tickets_dir=tickets_dir,
+            status="blocked",
+            terminal_condition=terminal_condition,
         )
-        state["status"] = "blocked"
-        state["updated_at"] = utc_now_iso()
-        _save_project_run_state(checkpoint_path, state)
-        _save_project_run_summary(summary_path, state)
-        return _build_project_run_result(state, checkpoint_path=checkpoint_path, summary_path=summary_path)
+
+
+def _finalize_project_run(
+    state: dict[str, Any],
+    *,
+    checkpoint_path: Path,
+    summary_path: Path,
+    review_bundle_path: Path,
+    tickets_dir: Path,
+    status: str,
+    terminal_condition: str,
+) -> ProjectRunResult:
+    state["status"] = status
+    state["terminal_condition"] = terminal_condition
+    state["updated_at"] = utc_now_iso()
+    _save_project_run_state(checkpoint_path, state)
+    _save_project_run_summary(summary_path, state)
+    _write_project_review_bundle(review_bundle_path=review_bundle_path, tickets_dir=tickets_dir, state=state)
+    return _build_project_run_result(
+        state,
+        checkpoint_path=checkpoint_path,
+        summary_path=summary_path,
+        review_bundle_path=review_bundle_path,
+    )
+
+
+def _determine_no_ready_terminal_condition(tickets_dir: Path) -> str:
+    scan_result = scan_ticket_directory(tickets_dir)
+    if any(
+        decision.reason.startswith("blocked_by_dependency") or decision.reason.startswith("missing_dependency")
+        for decision in scan_result.decisions
+    ):
+        return "blocked_dependency_graph"
+    return "no_ready_ticket"
+
+
+def _terminal_condition_for_outcome(validation_decision: ValidationDecision) -> str:
+    if validation_decision.decision == "handoff_required":
+        return "review_handoff_required"
+    if validation_decision.reason == "validation_failed":
+        return "validation_failure"
+    return "ticket_rejected"
 
 
 def _load_project_run_state(*, checkpoint_path: Path, expected_project_run_id: str) -> dict[str, Any]:
@@ -196,6 +297,11 @@ def _load_project_run_state(*, checkpoint_path: Path, expected_project_run_id: s
         raise RuntimeConfigError(
             f"project checkpoint id mismatch: expected {expected_project_run_id}, found {payload.get('project_run_id')}"
         )
+    payload.setdefault("retry_count", 0)
+    payload.setdefault("consecutive_failures", 0)
+    payload.setdefault("commit_policy", "disabled")
+    payload.setdefault("max_tickets", None)
+    payload.setdefault("max_consecutive_failures", 1)
     return payload
 
 
@@ -211,6 +317,8 @@ def _save_project_run_summary(summary_path: Path, state: dict[str, Any]) -> None
         "status": state["status"],
         "terminal_condition": state["terminal_condition"],
         "resumed": state["resumed"],
+        "retry_count": state["retry_count"],
+        "commit_policy": state["commit_policy"],
         "attempted_tickets": state["attempted_tickets"],
         "completed_tickets": state["completed_tickets"],
         "updated_at": state["updated_at"],
@@ -219,11 +327,68 @@ def _save_project_run_summary(summary_path: Path, state: dict[str, Any]) -> None
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
 
 
+def _write_project_review_bundle(
+    *,
+    review_bundle_path: Path,
+    tickets_dir: Path,
+    state: dict[str, Any],
+) -> None:
+    scan_result = scan_ticket_directory(tickets_dir)
+    completed_ids = set(state["completed_tickets"])
+    attempted_ids = {
+        record["ticket_id"]
+        for record in state["attempted_tickets"]
+        if record["ticket_id"] != "(runtime)"
+    }
+    blocked_by_attempt = [
+        {
+            "ticket_id": record["ticket_id"],
+            "reason": record.get("validation_reason") or record["validation_decision"],
+        }
+        for record in state["attempted_tickets"]
+        if record["ticket_id"] != "(runtime)" and record["validation_decision"] != "accepted"
+    ]
+    untouched_tickets = [
+        {
+            "ticket_id": record.id,
+            "status": record.status,
+            "reason": scan_result.decision_for(record.id).reason if scan_result.decision_for(record.id) else "unknown",
+        }
+        for record in scan_result.tickets
+        if record.id not in completed_ids and record.id not in attempted_ids
+    ]
+    blocked_graph_tickets = [
+        {
+            "ticket_id": decision.ticket_id,
+            "reason": decision.reason,
+        }
+        for decision in scan_result.decisions
+        if not decision.eligible
+        and decision.ticket_id not in completed_ids
+        and decision.reason.startswith(("blocked_by_dependency", "missing_dependency"))
+    ]
+    bundle = {
+        "schema_version": state["schema_version"],
+        "project_run_id": state["project_run_id"],
+        "status": state["status"],
+        "terminal_condition": state["terminal_condition"],
+        "commit_policy": state["commit_policy"],
+        "retry_count": state["retry_count"],
+        "completed_tickets": list(state["completed_tickets"]),
+        "blocked_tickets": blocked_by_attempt + blocked_graph_tickets,
+        "untouched_tickets": untouched_tickets,
+        "attempted_tickets": state["attempted_tickets"],
+    }
+    review_bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    review_bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n")
+
+
 def _build_project_run_result(
     state: dict[str, Any],
     *,
     checkpoint_path: Path,
     summary_path: Path,
+    review_bundle_path: Path,
 ) -> ProjectRunResult:
     attempts = tuple(
         ProjectTicketAttempt(
@@ -240,10 +405,13 @@ def _build_project_run_result(
         status=state["status"],
         terminal_condition=state["terminal_condition"] or "running",
         resumed=bool(state.get("resumed", False)),
+        retry_count=int(state.get("retry_count", 0)),
+        commit_policy=str(state.get("commit_policy", "disabled")),
         attempted_tickets=attempts,
         completed_tickets=tuple(state["completed_tickets"]),
         checkpoint_path=checkpoint_path,
         summary_path=summary_path,
+        review_bundle_path=review_bundle_path,
     )
 
 

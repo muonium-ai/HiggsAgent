@@ -252,10 +252,13 @@ def test_run_turnkey_project_cli_invokes_runtime_and_prints_summary(
             status="succeeded",
             terminal_condition="no_ready_ticket",
             resumed=False,
+            retry_count=0,
+            commit_policy="disabled",
             attempted_tickets=(SimpleNamespace(ticket_id="T-900010"), SimpleNamespace(ticket_id="T-900011")),
             completed_tickets=("T-900010", "T-900011"),
             checkpoint_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "checkpoint.json",
             summary_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "summary.json",
+            review_bundle_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "review-bundle.json",
         )
 
     monkeypatch.setattr(cli, "run_turnkey_project", fake_run_turnkey_project)
@@ -288,9 +291,13 @@ def test_run_turnkey_project_cli_invokes_runtime_and_prints_summary(
     assert captured["project_run_id"] == "project-run-123"
     assert captured["resume"] is True
     assert captured["validation_commands"] == ("uv run pytest tests",)
+    assert captured["max_tickets"] is None
+    assert captured["max_consecutive_failures"] == 1
+    assert captured["create_local_commit"] is False
     output = capsys.readouterr().out
     assert "project_run_id: project-run-123" in output
     assert "terminal_condition: no_ready_ticket" in output
+    assert "review_bundle_path: .higgs/local/project-runs/project-run-123/review-bundle.json" in output
 
 
 def test_run_turnkey_project_cli_requires_api_key(
@@ -327,6 +334,70 @@ def test_run_turnkey_project_cli_requires_api_key(
                 "uv run pytest tests",
             ]
         )
+
+
+def test_run_turnkey_project_cli_forwards_limits_and_commit_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    requirements_path = repo_root / "requirements.md"
+    tickets_dir = repo_root / "tickets"
+    tickets_dir.mkdir()
+    guardrails_path = repo_root / "guardrails.json"
+    write_policy_path = repo_root / "write-policy.json"
+    requirements_path.write_text("requirements\n")
+    guardrails_path.write_text("{}\n")
+    write_policy_path.write_text("{}\n")
+
+    captured: dict[str, object] = {}
+
+    def fake_run_turnkey_project(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            project_run_id="project-run-123",
+            status="blocked",
+            terminal_condition="max_ticket_limit_reached",
+            resumed=False,
+            retry_count=0,
+            commit_policy="disabled",
+            attempted_tickets=(),
+            completed_tickets=(),
+            checkpoint_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "checkpoint.json",
+            summary_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "summary.json",
+            review_bundle_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "review-bundle.json",
+        )
+
+    monkeypatch.setattr(cli, "run_turnkey_project", fake_run_turnkey_project)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    cli.main(
+        [
+            "run",
+            "turnkey-project",
+            "--repo-root",
+            str(repo_root),
+            "--requirements",
+            str(requirements_path),
+            "--tickets-dir",
+            str(tickets_dir),
+            "--guardrails",
+            str(guardrails_path),
+            "--write-policy",
+            str(write_policy_path),
+            "--validation-command",
+            "uv run pytest tests",
+            "--max-tickets",
+            "3",
+            "--max-consecutive-failures",
+            "2",
+            "--create-local-commit",
+        ]
+    )
+
+    assert captured["max_tickets"] == 3
+    assert captured["max_consecutive_failures"] == 2
+    assert captured["create_local_commit"] is True
 
 
 def test_validate_tickets_cli_invokes_muontickets_validate(

@@ -15,7 +15,7 @@ sync:
 	uv sync --extra dev
 
 tickets-validate:
-	uv run python3 tickets/mt/muontickets/muontickets/mt.py validate
+	uv run higgs-agent validate tickets
 
 test:
 	uv run pytest

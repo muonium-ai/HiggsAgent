@@ -33,13 +33,14 @@ Keep those surfaces separate. Do not collapse validation into provider execution
 
 ## Current Usage Surface
 
-The public dispatcher surface is currently Python-first.
+The public dispatcher surface is now split between a stable operator CLI and a Python library boundary.
 
-- analytics reporting has a CLI
-- dispatcher execution does not yet have a stable end-user CLI
-- the tested usage boundary is the application-layer function plus fixture-backed integration tests
+- analytics reporting is exposed through `higgs-agent analytics report`
+- sample-project bootstrap is exposed through `higgs-agent bootstrap sample-project`
+- explicit review-mode dispatcher execution is exposed through `higgs-agent run ticketed-project`
+- lower-level orchestration and integration tests still target `higgs_agent.application.dispatch_next_ready_ticket`
 
-When writing docs or examples, do not imply that `higgs-agent` can yet run repository dispatch end to end from a stable command-line interface.
+When writing docs or examples, keep the distinction clear: `higgs-agent` is the supported operator entrypoint for the implemented workflows, while the application-layer function remains the right boundary for lower-level embedding and fixture-backed tests.
 
 ## Configuration Assumptions
 

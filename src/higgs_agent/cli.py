@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import sys
 from datetime import datetime
 from json import JSONDecodeError
 from pathlib import Path
@@ -36,6 +38,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         _run_ticketed_project(args)
         return
 
+    if args.command == "validate" and args.validate_command == "tickets":
+        _run_validate_tickets(args)
+        return
+
     raise SystemExit("HiggsAgent runtime is not implemented yet.")
 
 
@@ -51,6 +57,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run")
     run_subparsers = run_parser.add_subparsers(dest="run_command")
+
+    validate_parser = subparsers.add_parser("validate")
+    validate_subparsers = validate_parser.add_subparsers(dest="validate_command")
 
     sample_project_choices = available_sample_projects()
     sample_project_parser = bootstrap_subparsers.add_parser("sample-project")
@@ -80,6 +89,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     run_ticketed_project_parser.add_argument("--validation-summary", required=True)
     run_ticketed_project_parser.add_argument("--openrouter-api-key")
+
+    validate_tickets_parser = validate_subparsers.add_parser("tickets")
+    validate_tickets_parser.add_argument("--repo-root", type=Path, default=Path("."))
 
     report_parser = analytics_subparsers.add_parser("report")
     report_parser.add_argument(
@@ -207,6 +219,30 @@ def _run_ticketed_project(args: argparse.Namespace) -> None:
     if outcome.execution_result.output_text:
         print("output:")
         print(outcome.execution_result.output_text)
+
+
+def _run_validate_tickets(args: argparse.Namespace) -> None:
+    repo_root = _require_directory_path(args.repo_root, flag_name="--repo-root")
+    mt_cli = repo_root / "tickets" / "mt" / "muontickets" / "muontickets" / "mt.py"
+    if not mt_cli.exists():
+        raise SystemExit(f"validate tickets failed: MuonTickets CLI not found at {mt_cli}")
+
+    result = subprocess.run(
+        [sys.executable, str(mt_cli), "validate"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        if stderr:
+            raise SystemExit(f"validate tickets failed: {stderr}")
+        raise SystemExit("validate tickets failed: MuonTickets validation exited with a non-zero status")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
 
 
 def _parse_optional_datetime(value: str | None, *, flag_name: str) -> datetime | None:

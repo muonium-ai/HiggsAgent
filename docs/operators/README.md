@@ -8,6 +8,8 @@ Operators responsible for running or reviewing HiggsAgent executions.
 
 This guide routes operators to runtime, guardrail, observability, and artifact-handling expectations.
 
+The supported installed operator surface lives under `uv run higgs-agent ...`.
+
 ## Read Next
 
 - [runbook.md](runbook.md)

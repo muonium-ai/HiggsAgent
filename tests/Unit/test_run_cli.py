@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -115,3 +116,36 @@ def test_run_ticketed_project_cli_requires_api_key(
                 "pytest passed",
             ]
         )
+
+
+def test_validate_tickets_cli_invokes_muontickets_validate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo_root = tmp_path / "repo"
+    mt_cli = repo_root / "tickets" / "mt" / "muontickets" / "muontickets"
+    mt_cli.mkdir(parents=True)
+    (mt_cli / "mt.py").write_text("print('ok')\n")
+
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(command, 0, stdout="board valid\n", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+
+    cli.main(["validate", "tickets", "--repo-root", str(repo_root)])
+
+    assert captured["command"][1].endswith("tickets/mt/muontickets/muontickets/mt.py")
+    assert captured["command"][2] == "validate"
+    assert captured["cwd"] == repo_root
+    assert "board valid" in capsys.readouterr().out
+
+
+def test_validate_tickets_cli_reports_missing_muontickets_cli(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    with pytest.raises(SystemExit, match=r"validate tickets failed: MuonTickets CLI not found"):
+        cli.main(["validate", "tickets", "--repo-root", str(repo_root)])

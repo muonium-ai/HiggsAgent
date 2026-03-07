@@ -55,8 +55,8 @@ This avoids three common problems:
 Contributors should rely on:
 
 - `uv sync` for environment and dependency installation.
-- `uv run ...` for project commands.
-- `uv run python3 tickets/mt/muontickets/muontickets/mt.py ...` for ticket board operations.
+- `uv run higgs-agent ...` for installed product commands such as analytics, bootstrap, runtime execution, and ticket validation.
+- `uv run python3 tickets/mt/muontickets/muontickets/mt.py ...` for lower-level MuonTickets operations that are not wrapped by HiggsAgent.
 - `make` for top-level project commands that wrap the `uv`-managed command surface.
 
 ## Initial Supported Environment

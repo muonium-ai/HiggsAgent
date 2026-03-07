@@ -25,16 +25,22 @@ The repository is currently through Phase 5 benchmarking foundations. The runtim
 	uv sync --extra dev
 	```
 
-3. Validate MuonTickets if needed:
+3. Check the installed HiggsAgent CLI surface:
 
 	```bash
-	uv run python3 tickets/mt/muontickets/muontickets/mt.py validate
+	uv run higgs-agent --help
 	```
 
-4. Review the runtime contract in [docs/runtime-tooling.md](docs/runtime-tooling.md).
-5. If you want to use HiggsAgent patterns in a fresh repository, start with [docs/adopters/new-project-quickstart.md](docs/adopters/new-project-quickstart.md).
-6. Review the benchmark methodology contract in [docs/phase-5-benchmarking-mode.md](docs/phase-5-benchmarking-mode.md) and the operator, contributor, and adopter guides under [docs/operators](docs/operators), [docs/contributors](docs/contributors), and [docs/adopters](docs/adopters).
-7. Use `make help` for the documented task surface.
+4. Validate MuonTickets if needed:
+
+	```bash
+	uv run higgs-agent validate tickets
+	```
+
+5. Review the runtime contract in [docs/runtime-tooling.md](docs/runtime-tooling.md).
+6. If you want to use HiggsAgent patterns in a fresh repository, start with [docs/adopters/new-project-quickstart.md](docs/adopters/new-project-quickstart.md).
+7. Review the benchmark methodology contract in [docs/phase-5-benchmarking-mode.md](docs/phase-5-benchmarking-mode.md) and the operator, contributor, and adopter guides under [docs/operators](docs/operators), [docs/contributors](docs/contributors), and [docs/adopters](docs/adopters).
+8. Use `make help` for the documented task surface.
 
 ## Repository Guides
 
@@ -53,5 +59,5 @@ The backlog is tracked with MuonTickets. Use the submodule CLI from the reposito
 ```bash
 uv run python3 tickets/mt/muontickets/muontickets/mt.py ls
 uv run python3 tickets/mt/muontickets/muontickets/mt.py show T-000003
-uv run python3 tickets/mt/muontickets/muontickets/mt.py validate
+uv run higgs-agent validate tickets
 ```

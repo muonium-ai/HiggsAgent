@@ -34,7 +34,7 @@ The following layout is the expected baseline:
 The repository should document commands equivalent to these:
 
 - `uv sync --extra dev`
-- `uv run python3 tickets/mt/muontickets/muontickets/mt.py validate`
+- `uv run higgs-agent validate tickets`
 - `uv run pytest`
 - `uv run ruff check src tests`
 

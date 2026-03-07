@@ -18,6 +18,7 @@ Define the supported setup path for HiggsAgent under the Python-plus-uv contract
 
 ```bash
 uv sync --extra dev
+uv run higgs-agent --help
 make tickets-validate
 make lint
 ```

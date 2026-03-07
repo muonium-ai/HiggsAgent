@@ -15,6 +15,15 @@ Summarize the safe operating model before the full runtime exists.
 - Treat protected paths and secret-suspect output as review-only events.
 - Use the review handoff template when automation cannot complete safely.
 
+## Installed Command Surface
+
+Operators should use the installed HiggsAgent CLI from the repository environment:
+
+- `uv run higgs-agent validate tickets`
+- `uv run higgs-agent analytics report ...`
+- `uv run higgs-agent bootstrap sample-project ...`
+- `uv run higgs-agent run ticketed-project ...`
+
 ## Normative Sources
 
 - [../safety-model.md](../safety-model.md)

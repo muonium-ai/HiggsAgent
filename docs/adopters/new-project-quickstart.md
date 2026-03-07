@@ -62,7 +62,7 @@ Use the manual flow below when you are creating a fully custom repository instea
    git submodule add https://github.com/muonium-ai/muontickets.git tickets/mt/muontickets
    git submodule update --init --recursive
    uv run python3 tickets/mt/muontickets/muontickets/mt.py init
-   uv run python3 tickets/mt/muontickets/muontickets/mt.py validate
+   uv run higgs-agent validate tickets
    ```
 
 5. Add the first project-local control files.
@@ -101,7 +101,7 @@ sync:
 	uv sync --extra dev
 
 tickets-validate:
-	uv run python3 tickets/mt/muontickets/muontickets/mt.py validate
+   uv run higgs-agent validate tickets
 
 test:
 	uv run pytest
@@ -139,7 +139,7 @@ This order reduces the risk of building execution features before the repository
 
 ## Common Failure Modes
 
-- Running `mt.py` from the wrong path instead of `tickets/mt/muontickets/muontickets/mt.py`.
+- Running MuonTickets from the wrong path instead of using `higgs-agent validate tickets` or the documented `tickets/mt/muontickets/muontickets/mt.py` path.
 - Treating ticket lifecycle files as hand-edited state for `claim`, `done`, `archive`, or `comment` instead of using the CLI.
 - Adding automation before defining protected paths and write policy.
 - Mixing multiple environment managers instead of making `uv` the single documented entrypoint.

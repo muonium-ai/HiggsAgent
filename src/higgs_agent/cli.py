@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Sequence
 
@@ -71,28 +72,60 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _run_analytics_report(args: argparse.Namespace) -> None:
-    summaries = load_attempt_summaries(args.attempt_summaries)
-    ticket_metadata_index = build_ticket_metadata_index(args.tickets_dir)
-    analytics_filter = AnalyticsFilter(
-        provider=args.provider,
-        model=args.model,
-        ticket_type=args.ticket_type,
-        ticket_priority=args.priority,
-        higgs_platform=args.platform,
-        higgs_complexity=args.complexity,
-        final_result=args.result,
-        start_at=_parse_optional_datetime(args.start_at),
-        end_at=_parse_optional_datetime(args.end_at),
-        group_by=tuple(args.group_by),
-    )
-    report = aggregate_attempt_summaries(summaries, ticket_metadata_index, analytics_filter)
+    try:
+        attempt_summaries_path = _require_file_path(
+            args.attempt_summaries,
+            flag_name="--attempt-summaries",
+        )
+        tickets_dir = _require_directory_path(args.tickets_dir, flag_name="--tickets-dir")
+        summaries = load_attempt_summaries(attempt_summaries_path)
+        ticket_metadata_index = build_ticket_metadata_index(tickets_dir)
+        analytics_filter = AnalyticsFilter(
+            provider=args.provider,
+            model=args.model,
+            ticket_type=args.ticket_type,
+            ticket_priority=args.priority,
+            higgs_platform=args.platform,
+            higgs_complexity=args.complexity,
+            final_result=args.result,
+            start_at=_parse_optional_datetime(args.start_at, flag_name="--start-at"),
+            end_at=_parse_optional_datetime(args.end_at, flag_name="--end-at"),
+            group_by=tuple(args.group_by),
+        )
+        report = aggregate_attempt_summaries(summaries, ticket_metadata_index, analytics_filter)
+    except FileNotFoundError as exc:
+        raise SystemExit(f"analytics report failed: {exc}") from exc
+    except JSONDecodeError as exc:
+        raise SystemExit(f"analytics report failed: invalid JSON in attempt summaries: {exc}") from exc
+    except ValueError as exc:
+        raise SystemExit(f"analytics report failed: {exc}") from exc
+
     if args.format == "json":
         print(report.to_json())
         return
     print(render_report_table(report))
 
 
-def _parse_optional_datetime(value: str | None) -> datetime | None:
+def _parse_optional_datetime(value: str | None, *, flag_name: str) -> datetime | None:
     if value is None:
         return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"invalid ISO 8601 datetime for {flag_name}: {value!r}") from exc
+
+
+def _require_file_path(path: Path, *, flag_name: str) -> Path:
+    if not path.exists():
+        raise FileNotFoundError(f"{flag_name} path not found: {path}")
+    if not path.is_file():
+        raise ValueError(f"{flag_name} must be a file: {path}")
+    return path
+
+
+def _require_directory_path(path: Path, *, flag_name: str) -> Path:
+    if not path.exists():
+        raise FileNotFoundError(f"{flag_name} path not found: {path}")
+    if not path.is_dir():
+        raise ValueError(f"{flag_name} must be a directory: {path}")
+    return path

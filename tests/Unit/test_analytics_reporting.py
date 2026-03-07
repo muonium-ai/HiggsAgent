@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import jsonschema
+import pytest
 
 from higgs_agent.analytics import (
     AnalyticsFilter,
@@ -259,6 +260,116 @@ def test_aggregate_attempt_summaries_handles_local_partial_usage_without_billing
     assert report.records[0]["metrics"]["cost_usd_total"] == 0.0
     assert report.records[0]["metrics"]["total_tokens_total"] == 24
     assert report.records[0]["source"]["export_safe"] is True
+
+
+def test_cli_report_fails_for_missing_attempt_summaries_file(tmp_path: Path) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+
+    with pytest.raises(SystemExit, match=r"analytics report failed: --attempt-summaries path not found"):
+        main(
+            [
+                "analytics",
+                "report",
+                "--attempt-summaries",
+                str(tmp_path / "missing.ndjson"),
+                "--tickets-dir",
+                str(tickets_dir),
+            ]
+        )
+
+
+def test_cli_report_fails_for_invalid_tickets_dir(tmp_path: Path) -> None:
+    attempt_summaries_path = tmp_path / "attempt-summaries.ndjson"
+    attempt_summaries_path.write_text("\n")
+
+    with pytest.raises(SystemExit, match=r"analytics report failed: --tickets-dir path not found"):
+        main(
+            [
+                "analytics",
+                "report",
+                "--attempt-summaries",
+                str(attempt_summaries_path),
+                "--tickets-dir",
+                str(tmp_path / "missing-tickets"),
+            ]
+        )
+
+
+def test_cli_report_fails_for_invalid_start_datetime(tmp_path: Path) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+    attempt_summaries_path = tmp_path / "attempt-summaries.ndjson"
+    attempt_summaries_path.write_text("\n")
+
+    with pytest.raises(SystemExit, match=r"analytics report failed: invalid ISO 8601 datetime for --start-at"):
+        main(
+            [
+                "analytics",
+                "report",
+                "--attempt-summaries",
+                str(attempt_summaries_path),
+                "--tickets-dir",
+                str(tickets_dir),
+                "--start-at",
+                "not-a-datetime",
+            ]
+        )
+
+
+def test_cli_report_fails_for_malformed_attempt_summary_json(tmp_path: Path) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+    attempt_summaries_path = tmp_path / "attempt-summaries.ndjson"
+    attempt_summaries_path.write_text("{not-json}\n")
+
+    with pytest.raises(SystemExit, match=r"analytics report failed: invalid JSON in attempt summaries"):
+        main(
+            [
+                "analytics",
+                "report",
+                "--attempt-summaries",
+                str(attempt_summaries_path),
+                "--tickets-dir",
+                str(tickets_dir),
+            ]
+        )
+
+
+def test_cli_report_fails_for_malformed_ticket_metadata(tmp_path: Path) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+    (tickets_dir / "T-000999.md").write_text("not-frontmatter\n")
+    attempt_summaries_path = tmp_path / "attempt-summaries.ndjson"
+    attempt_summaries_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "run_id": "run-bad-ticket",
+                "attempt_id": "attempt-bad-ticket",
+                "ticket_id": "T-000999",
+                "started_at": "2026-03-06T12:00:00Z",
+                "ended_at": "2026-03-06T12:00:01Z",
+                "final_result": "succeeded",
+                "provider": "openrouter",
+                "model": "anthropic/claude-sonnet-4",
+                "usage": {},
+            }
+        )
+        + "\n"
+    )
+
+    with pytest.raises(SystemExit, match=r"analytics report failed: .*missing YAML frontmatter"):
+        main(
+            [
+                "analytics",
+                "report",
+                "--attempt-summaries",
+                str(attempt_summaries_path),
+                "--tickets-dir",
+                str(tickets_dir),
+            ]
+        )
 
 
 def _write_ticket(

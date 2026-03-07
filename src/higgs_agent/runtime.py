@@ -41,12 +41,22 @@ class AutonomousFileWrite:
 
 
 @dataclass(frozen=True, slots=True)
+class AutonomousFilePatch:
+    """Normalized exact-match patch requested by an autonomous session."""
+
+    path: str
+    before: str
+    after: str
+
+
+@dataclass(frozen=True, slots=True)
 class AutonomousPlan:
     """Structured filesystem mutation plan returned by the coding model."""
 
     summary: str
     directories: tuple[str, ...]
     writes: tuple[AutonomousFileWrite, ...]
+    patches: tuple[AutonomousFilePatch, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -800,9 +810,14 @@ def _build_autonomous_prompt(
             (
                 "Return only valid JSON with this shape: "
                 '{"summary": "short summary", "directories": ["relative/path"], '
-                '"writes": [{"path": "relative/file.py", "content": "full file contents"}]}'
+                '"writes": [{"path": "relative/file.py", "content": "full file contents"}], '
+                '"patches": [{"path": "relative/file.py", "before": "exact existing text", '
+                '"after": "replacement text"}]}'
             ),
-            "Use repository-relative paths only. Do not include markdown fences outside JSON.",
+            (
+                "Use repository-relative paths only. Patch entries must target existing files and replace a single "
+                "exact matched snippet. Do not include markdown fences outside JSON."
+            ),
         ]
     )
 
@@ -857,6 +872,11 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
         raw_writes = []
     if not isinstance(raw_writes, list):
         raise RuntimeConfigError("autonomous response 'writes' must be a list")
+    raw_patches = payload.get("patches", payload.get("diffs", []))
+    if raw_patches is None:
+        raw_patches = []
+    if not isinstance(raw_patches, list):
+        raise RuntimeConfigError("autonomous response 'patches' must be a list")
 
     writes: list[AutonomousFileWrite] = []
     for raw_write in raw_writes:
@@ -868,18 +888,49 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
             raise RuntimeConfigError("autonomous response writes require string 'path' and 'content'")
         writes.append(AutonomousFileWrite(path=path, content=content))
 
+    patches = _parse_autonomous_patch_entries(raw_patches, context_label="response")
+
     directories = list(raw_directories)
     if scaffold_payload is not None:
         scaffold_directories, scaffold_writes = _parse_scaffold_payload(scaffold_payload)
         directories.extend(scaffold_directories)
         writes.extend(scaffold_writes)
 
-    _reject_duplicate_materialization_paths(directories, writes)
+    _reject_duplicate_materialization_paths(directories, writes, patches)
 
-    if not directories and not writes:
-        raise RuntimeConfigError("autonomous response did not describe any scaffold directories or file writes")
+    if not directories and not writes and not patches:
+        raise RuntimeConfigError(
+            "autonomous response did not describe any scaffold directories, file writes, or patch operations"
+        )
 
-    return AutonomousPlan(summary=summary, directories=tuple(directories), writes=tuple(writes))
+    return AutonomousPlan(
+        summary=summary,
+        directories=tuple(directories),
+        writes=tuple(writes),
+        patches=tuple(patches),
+    )
+
+
+def _parse_autonomous_patch_entries(
+    raw_patches: list[object], *, context_label: str
+) -> list[AutonomousFilePatch]:
+    patches: list[AutonomousFilePatch] = []
+    for raw_patch in raw_patches:
+        if not isinstance(raw_patch, dict):
+            raise RuntimeConfigError(f"autonomous {context_label} patch entries must be objects")
+        path = raw_patch.get("path")
+        before = raw_patch.get("before", raw_patch.get("find", raw_patch.get("old_text")))
+        after = raw_patch.get("after", raw_patch.get("replace", raw_patch.get("new_text")))
+        if not isinstance(path, str) or not path:
+            raise RuntimeConfigError(f"autonomous {context_label} patch entries require a non-empty string 'path'")
+        if not isinstance(before, str) or not before:
+            raise RuntimeConfigError(
+                f"autonomous {context_label} patch entries require a non-empty string 'before'"
+            )
+        if not isinstance(after, str):
+            raise RuntimeConfigError(f"autonomous {context_label} patch entries require string 'after'")
+        patches.append(AutonomousFilePatch(path=path, before=before, after=after))
+    return patches
 
 
 def _parse_scaffold_payload(payload: dict[str, object]) -> tuple[list[str], list[AutonomousFileWrite]]:
@@ -958,18 +1009,32 @@ def _parse_scaffold_tree_entry(entry: object, *, parent_prefix: Path) -> tuple[l
 def _reject_duplicate_materialization_paths(
     directories: list[str],
     writes: list[AutonomousFileWrite],
+    patches: list[AutonomousFilePatch],
 ) -> None:
-    duplicate_directories = _duplicate_items(directories)
+    duplicate_directories = _duplicate_items([str(_normalize_relative_path(directory)).replace("\\", "/") for directory in directories])
     if duplicate_directories:
         raise RuntimeConfigError(
             f"autonomous scaffold declared duplicate directories: {', '.join(sorted(duplicate_directories))}"
         )
 
-    write_paths = [write.path for write in writes]
+    write_paths = [str(_normalize_relative_path(write.path)).replace("\\", "/") for write in writes]
     duplicate_writes = _duplicate_items(write_paths)
     if duplicate_writes:
         raise RuntimeConfigError(
             f"autonomous scaffold declared duplicate file writes: {', '.join(sorted(duplicate_writes))}"
+        )
+
+    patch_paths = [str(_normalize_relative_path(patch.path)).replace("\\", "/") for patch in patches]
+    duplicate_patches = _duplicate_items(patch_paths)
+    if duplicate_patches:
+        raise RuntimeConfigError(
+            f"autonomous scaffold declared duplicate file patches: {', '.join(sorted(duplicate_patches))}"
+        )
+
+    overlapping_paths = sorted(set(write_paths).intersection(patch_paths))
+    if overlapping_paths:
+        raise RuntimeConfigError(
+            f"autonomous scaffold declared overlapping write and patch targets: {', '.join(overlapping_paths)}"
         )
 
 
@@ -1028,6 +1093,10 @@ def _apply_autonomous_plan(
                 "summary": plan.summary,
                 "directories": list(plan.directories),
                 "writes": [write.path for write in plan.writes],
+                "patches": [
+                    {"path": patch.path, "before": patch.before, "after": patch.after}
+                    for patch in plan.patches
+                ],
             },
         },
     )
@@ -1064,6 +1133,46 @@ def _apply_autonomous_plan(
             event_type="file.written",
             status="succeeded",
             payload={"path": str(relative_path).replace("\\", "/")},
+        )
+
+    for patch in plan.patches:
+        relative_path = _normalize_relative_path(patch.path)
+        absolute_path = repo_root / relative_path
+        if not absolute_path.exists():
+            raise RuntimeConfigError(
+                f"autonomous patch target does not exist: {str(relative_path).replace('\\', '/')}"
+            )
+        before_content = absolute_path.read_text()
+        match_count = before_content.count(patch.before)
+        if match_count == 0:
+            raise RuntimeConfigError(
+                f"autonomous patch target did not contain the expected text: {str(relative_path).replace('\\', '/')}"
+            )
+        if match_count > 1:
+            raise RuntimeConfigError(
+                f"autonomous patch target matched multiple locations and is ambiguous: {str(relative_path).replace('\\', '/')}"
+            )
+        after_content = before_content.replace(patch.before, patch.after, 1)
+        absolute_path.write_text(after_content)
+        if before_content == after_content:
+            continue
+        additions, deletions = _line_diff_stats(before_content, after_content)
+        changed_files.append(
+            ProposedFileChange(
+                path=str(relative_path).replace("\\", "/"),
+                additions=additions,
+                deletions=deletions,
+                is_binary=False,
+            )
+        )
+        updated_result = _append_event(
+            updated_result,
+            event_type="file.patched",
+            status="succeeded",
+            payload={
+                "path": str(relative_path).replace("\\", "/"),
+                "mode": "exact_replace",
+            },
         )
 
     return tuple(changed_files), updated_result

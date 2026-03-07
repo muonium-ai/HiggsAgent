@@ -113,6 +113,7 @@ def dispatch_next_ready_ticket(
         ),
         load_write_policy(write_policy_path),
     )
+    execution_result = _with_validation_events(execution_result, validation_decision)
 
     return DispatchOutcome(
         ticket=ticket,
@@ -302,3 +303,59 @@ def _dispatcher_event(
     if error is not None:
         event["error"] = error
     return event
+
+
+def _with_validation_events(
+    execution_result: ProviderExecutionResult,
+    validation_decision: ValidationDecision,
+) -> ProviderExecutionResult:
+    validation_error = _validation_error_payload(validation_decision)
+    validation_events = list(execution_result.events)
+    validation_events.append(
+        _dispatcher_event(
+            event_type="validation.completed",
+            status="succeeded" if validation_decision.decision == "accepted" else "failed",
+            run_id=execution_result.attempt_summary["run_id"],
+            attempt_id=execution_result.attempt_summary["attempt_id"],
+            ticket_id=execution_result.attempt_summary["ticket_id"],
+            executor_version="phase-1",
+            repo_head=None,
+            sequence=len(validation_events),
+            payload={
+                "decision": validation_decision.decision,
+                "reason": validation_decision.reason,
+                "diagnostics": list(validation_decision.diagnostics),
+            },
+            error=validation_error,
+        )
+    )
+    validation_events.append(
+        _dispatcher_event(
+            event_type="write_gate.decided",
+            status="succeeded" if validation_decision.decision == "accepted" else "failed",
+            run_id=execution_result.attempt_summary["run_id"],
+            attempt_id=execution_result.attempt_summary["attempt_id"],
+            ticket_id=execution_result.attempt_summary["ticket_id"],
+            executor_version="phase-1",
+            repo_head=None,
+            sequence=len(validation_events),
+            payload={
+                "decision": validation_decision.decision,
+                "reason": validation_decision.reason,
+                "changed_paths": list(validation_decision.changed_paths),
+                "requires_human_review": validation_decision.requires_human_review,
+            },
+            error=validation_error,
+        )
+    )
+    return replace(execution_result, events=tuple(validation_events))
+
+
+def _validation_error_payload(validation_decision: ValidationDecision) -> dict[str, object] | None:
+    if validation_decision.decision == "accepted":
+        return None
+    return {
+        "kind": "validation",
+        "message": validation_decision.reason,
+        "retryable": validation_decision.decision == "handoff_required",
+    }

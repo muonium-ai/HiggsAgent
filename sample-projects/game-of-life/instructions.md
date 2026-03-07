@@ -268,6 +268,8 @@ uv run --directory tools/higgsagent higgs-agent run ticketed-project \
 
 This command runs the existing deterministic dispatcher pipeline for the next ready ticket. It does not infer repository mutations for you; the proposed change set and validation summary are explicit inputs to the write gate.
 
+When the command completes, inspect the concrete local outputs under `.higgs/local/runs/<run_id>/<attempt_id>/events.ndjson`, `.higgs/local/runs/<run_id>/<attempt_id>/artifacts/`, and `.higgs/local/analytics/attempt-summaries.ndjson`.
+
 Give the coding agent a prompt like this:
 
 ```text

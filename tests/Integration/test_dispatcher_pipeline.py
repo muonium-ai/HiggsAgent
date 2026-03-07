@@ -55,6 +55,8 @@ def test_dispatcher_pipeline_accepts_clean_allowed_changes(tmp_path: Path) -> No
     assert outcome.route.selected is True
     assert outcome.execution_result.status == "succeeded"
     assert outcome.validation_decision.decision == "accepted"
+    assert outcome.execution_result.events[-2]["event_type"] == "validation.completed"
+    assert outcome.execution_result.events[-1]["event_type"] == "write_gate.decided"
     assert transport.calls
 
 

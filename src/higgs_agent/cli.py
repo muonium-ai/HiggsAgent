@@ -199,6 +199,11 @@ def _run_ticketed_project(args: argparse.Namespace) -> None:
     print(f"model: {outcome.route.model_id or 'blocked'}")
     print(f"execution_status: {outcome.execution_result.status}")
     print(f"validation_decision: {outcome.validation_decision.decision}")
+    telemetry_paths = getattr(outcome.execution_result, "metadata", {}).get("telemetry_paths", {})
+    if telemetry_paths:
+        print(f"events_path: {telemetry_paths['events']}")
+        print(f"artifacts_dir: {telemetry_paths['artifacts_dir']}")
+        print(f"attempt_summaries_path: {telemetry_paths['attempt_summaries']}")
     if outcome.execution_result.output_text:
         print("output:")
         print(outcome.execution_result.output_text)

@@ -8,6 +8,7 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass, replace
+import shutil
 from pathlib import Path
 from typing import Any, Iterable
 from uuid import uuid4
@@ -546,6 +547,7 @@ def run_autonomous_ticket(
             ticket=ticket,
             requirements_text=requirements_text,
             workspace_snapshot=workspace_snapshot,
+            repo_root=repo_root,
         ),
         system_prompt=(
             "You are HiggsAgent autonomous coding runtime. "
@@ -792,6 +794,7 @@ def _build_autonomous_prompt(
     ticket: TicketRecord,
     requirements_text: str,
     workspace_snapshot: tuple[dict[str, str], ...],
+    repo_root: Path,
 ) -> str:
     workspace_sections = []
     for item in workspace_snapshot:
@@ -799,6 +802,7 @@ def _build_autonomous_prompt(
     workspace_text = "\n\n".join(workspace_sections) if workspace_sections else "No existing workspace files captured."
     title = ticket.frontmatter.get("title", ticket.id)
     body = ticket.body.strip() or "No additional ticket body."
+    repo_root_name = repo_root.name
     return "\n\n".join(
         [
             f"Ticket: {ticket.id} - {title}",
@@ -814,6 +818,12 @@ def _build_autonomous_prompt(
                 '"writes": [{"path": "relative/file.py", "content": "full file contents"}], '
                 '"patches": [{"path": "relative/file.py", "before": "exact existing text", '
                 '"after": "replacement text"}]}'
+            ),
+            (
+                f"The repository root is already the {repo_root_name} project directory. "
+                "All output paths must be relative to this root. "
+                "Use paths like `src/...`, `tests/...`, `fixtures/...`, `README.md`, and `pyproject.toml`. "
+                f"Do not prefix paths with `sample-projects/{repo_root_name}/`, `{repo_root_name}/`, or any outer workspace directory."
             ),
             (
                 "Use repository-relative paths only. Patch entries must target existing files and replace a single "
@@ -1102,7 +1112,7 @@ def _apply_autonomous_plan(
         },
     )
     for directory in plan.directories:
-        relative_dir = _normalize_relative_path(directory)
+        relative_dir = _normalize_repo_relative_path(repo_root, directory)
         (repo_root / relative_dir).mkdir(parents=True, exist_ok=True)
         updated_result = _append_event(
             updated_result,
@@ -1113,7 +1123,7 @@ def _apply_autonomous_plan(
 
     changed_files: list[ProposedFileChange] = []
     for write in plan.writes:
-        relative_path = _normalize_relative_path(write.path)
+        relative_path = _normalize_repo_relative_path(repo_root, write.path)
         absolute_path = repo_root / relative_path
         absolute_path.parent.mkdir(parents=True, exist_ok=True)
         before_content = absolute_path.read_text() if absolute_path.exists() else None
@@ -1137,7 +1147,7 @@ def _apply_autonomous_plan(
         )
 
     for patch in plan.patches:
-        relative_path = _normalize_relative_path(patch.path)
+        relative_path = _normalize_repo_relative_path(repo_root, patch.path)
         absolute_path = repo_root / relative_path
         if not absolute_path.exists():
             raise RuntimeConfigError(
@@ -1371,7 +1381,26 @@ def _normalize_relative_path(path_text: str) -> Path:
     return path
 
 
+def _normalize_repo_relative_path(repo_root: Path, path_text: str) -> Path:
+    path = _normalize_relative_path(path_text)
+    repo_markers = {ancestor.name for ancestor in (repo_root, *repo_root.parents) if ancestor.name}
+    parts = path.parts
+
+    for index, part in enumerate(parts[:-1]):
+        if part != repo_root.name:
+            continue
+        if any(prefix not in repo_markers for prefix in parts[:index]):
+            continue
+        trimmed = Path(*parts[index + 1 :])
+        return _normalize_relative_path(str(trimmed))
+
+    return path
+
+
 def _default_muontickets_cli(repo_root: Path) -> Path:
+    mt_binary = shutil.which("mt")
+    if mt_binary:
+        return Path(mt_binary)
     return repo_root / "tickets" / "mt" / "muontickets" / "muontickets" / "mt.py"
 
 
@@ -1384,8 +1413,12 @@ def _require_file_exists(path: Path, *, flag_name: str) -> Path:
 
 
 def _run_muontickets_command(mt_cli_path: Path, args: Iterable[str], *, cwd: Path) -> str:
+    command = [str(mt_cli_path), *args]
+    if mt_cli_path.suffix == ".py":
+        command = [sys.executable, str(mt_cli_path), *args]
+
     completed = subprocess.run(
-        [sys.executable, str(mt_cli_path), *args],
+        command,
         cwd=str(cwd),
         capture_output=True,
         text=True,

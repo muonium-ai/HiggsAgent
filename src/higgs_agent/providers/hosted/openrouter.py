@@ -209,9 +209,20 @@ class OpenRouterExecutor:
                     last_error,
                 )
 
-            usage = _parse_usage(response_payload, int((monotonic() - started_at) * 1000))
-            tool_calls = _parse_tool_calls(response_payload)
-            output_text = _parse_output_text(response_payload)
+            try:
+                usage = _parse_usage(response_payload, int((monotonic() - started_at) * 1000))
+                tool_calls = _parse_tool_calls(response_payload)
+                output_text = _parse_output_text(response_payload)
+            except OpenRouterExecutorError as exc:
+                last_error = {"kind": "provider", "message": str(exc), "retryable": False}
+                events.append("provider.responded", "failed", error=last_error)
+                return self._failed_result(
+                    events,
+                    summary,
+                    execution_input,
+                    retry_count,
+                    last_error,
+                )
 
             guardrail_error = self._guardrail_error(usage, tool_calls)
             if guardrail_error is not None:

@@ -113,6 +113,29 @@ def test_local_executor_failure_preserves_schema_compatible_error_shapes() -> No
     _validate_event_stream(result.events)
 
 
+def test_local_executor_normalizes_malformed_output_payload_into_failed_result() -> None:
+    executor = LocalModelExecutor(
+        limits=load_executor_limits(Path("config/guardrails.example.json")),
+        transport=FakeLocalTransport(
+            {
+                "output_text": ["not", "a", "string"],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            }
+        ),
+    )
+
+    result = executor.execute(_executor_input(execution_target="local"))
+
+    assert result.status == "failed"
+    assert result.attempt_summary["error"] == {
+        "kind": "provider",
+        "message": "local transport output_text must be a string",
+        "retryable": False,
+    }
+    _validate_attempt_summary(result.attempt_summary)
+    _validate_event_stream(result.events)
+
+
 def _executor_input(*, execution_target: str) -> ExecutorInput:
     semantics = classify_ticket(
         {

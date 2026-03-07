@@ -230,6 +230,42 @@ def test_executor_requires_tool_invoker_when_tools_are_returned() -> None:
     assert result.attempt_summary["error"]["kind"] == "tool"
 
 
+@pytest.mark.parametrize(
+    ("response_payload", "expected_message"),
+    [
+        ({"usage": {}}, "provider response missing choices"),
+        (
+            {"choices": [{"message": {"content": "", "tool_calls": {}}}], "usage": {}},
+            "provider response tool_calls must be a list",
+        ),
+        (
+            {"choices": [{"message": {"content": "bad usage"}}], "usage": []},
+            "provider response usage must be an object",
+        ),
+    ],
+)
+def test_executor_normalizes_malformed_provider_payloads_into_failed_results(
+    response_payload: dict[str, object],
+    expected_message: str,
+) -> None:
+    executor = OpenRouterExecutor(
+        limits=load_executor_limits(Path("config/guardrails.example.json")),
+        transport=FakeTransport([response_payload]),
+    )
+
+    result = executor.execute(_executor_input(ticket_type="code"))
+
+    assert result.status == "failed"
+    assert result.retry_count == 0
+    assert result.attempt_summary["error"] == {
+        "kind": "provider",
+        "message": expected_message,
+        "retryable": False,
+    }
+    assert result.events[-1]["event_type"] == "execution.completed"
+    assert result.events[-1]["status"] == "failed"
+
+
 def test_executor_limit_loader_rejects_missing_fields() -> None:
     with pytest.raises(ValueError, match="max_prompt_tokens"):
         load_executor_limits(Path("tests/Fixtures/config/guardrails_invalid_executor_limits.json"))

@@ -106,14 +106,18 @@ class LocalModelExecutor:
             error = {"kind": "provider", "message": str(exc), "retryable": True}
             return self._failed_result(events, summary, execution_input, error)
 
-        if not isinstance(response_payload, dict):
-            raise LocalModelExecutorError("local transport payload must be an object")
+        try:
+            if not isinstance(response_payload, dict):
+                raise LocalModelExecutorError("local transport payload must be an object")
 
-        latency_ms = int((monotonic() - started_at) * 1000)
-        usage = _parse_local_usage(response_payload, latency_ms)
-        output_text = response_payload.get("output_text", "")
-        if not isinstance(output_text, str):
-            raise LocalModelExecutorError("local transport output_text must be a string")
+            latency_ms = int((monotonic() - started_at) * 1000)
+            usage = _parse_local_usage(response_payload, latency_ms)
+            output_text = response_payload.get("output_text", "")
+            if not isinstance(output_text, str):
+                raise LocalModelExecutorError("local transport output_text must be a string")
+        except LocalModelExecutorError as exc:
+            error = {"kind": "provider", "message": str(exc), "retryable": False}
+            return self._failed_result(events, summary, execution_input, error)
 
         events.append(
             "provider.responded",

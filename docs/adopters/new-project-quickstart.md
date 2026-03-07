@@ -12,7 +12,7 @@ Provide a concrete bootstrap path for a new project that wants HiggsAgent-style 
 
 This guide is about creating a repository that adopts HiggsAgent's workflow and contracts.
 
-It is not a one-command scaffold. HiggsAgent currently provides reference architecture, contracts, and project patterns rather than a packaged `init` command.
+It is not a one-command scaffold. HiggsAgent provides reference architecture, contracts, project patterns, and a single-ticket autonomous runtime rather than a packaged full-project `init` or project-completion command.
 
 ## Before You Start
 
@@ -134,6 +134,8 @@ Recommended order:
 3. Define your write policy and guardrails.
 4. Define your project-specific ticket frontmatter extensions.
 5. Only then add provider integrations, execution logic, or automation.
+
+After the repository boundaries are explicit, you can use `uv run higgs-agent run autonomous-ticket ...` as the code-writing engine for one ready ticket at a time.
 
 This order reduces the risk of building execution features before the repository boundaries are explicit.
 

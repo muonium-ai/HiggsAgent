@@ -12,8 +12,8 @@ Explain what a host repository must provide and what contracts HiggsAgent expect
 
 - [new-project-quickstart.md](new-project-quickstart.md)
 - [integration-overview.md](integration-overview.md)
-- [benchmarking.md](benchmarking.md)
 - [repository-requirements.md](repository-requirements.md)
+- [benchmarking.md](benchmarking.md)
 - [../ticket-semantics.md](../ticket-semantics.md)
 
 ## Normative Sources
@@ -28,4 +28,5 @@ Explain what a host repository must provide and what contracts HiggsAgent expect
 - required ticket semantics change
 - write policy or repository constraints change
 - integration assumptions change
+- autonomous execution setup or review expectations change
 - benchmark methodology or public comparison limits change

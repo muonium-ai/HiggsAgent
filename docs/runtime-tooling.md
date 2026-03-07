@@ -2,7 +2,7 @@
 
 ## Objective
 
-This document defines the supported runtime and tooling model for HiggsAgent through the Phase 3 hybrid execution milestone.
+This document defines the supported runtime and tooling model for HiggsAgent through the shipped Phase 6 autonomous single-ticket milestone.
 
 ## Contract
 
@@ -59,6 +59,14 @@ Contributors should rely on:
 - `uv run python3 tickets/mt/muontickets/muontickets/mt.py ...` for lower-level MuonTickets operations that are not wrapped by HiggsAgent.
 - `make` for top-level project commands that wrap the `uv`-managed command surface.
 
+The current runtime surfaces are:
+
+- `uv run higgs-agent validate tickets`
+- `uv run higgs-agent bootstrap sample-project ...`
+- `uv run higgs-agent analytics report ...`
+- `uv run higgs-agent run ticketed-project ...`
+- `uv run higgs-agent run autonomous-ticket ...`
+
 ## Initial Supported Environment
 
 - Python 3.12+
@@ -78,25 +86,37 @@ These are intentionally not committed yet:
 - Automatic local-runtime discovery
 - Hosted-to-local fallback policy
 
-## Phase 6 Autonomous Runtime Expectations
+## Phase 6 Autonomous Runtime Surface
 
 Phase 6 adds a first-party autonomous coding runtime without changing the core Python-plus-`uv` toolchain.
 
 - Autonomous coding remains a Python runtime surface managed through `uv`.
-- The runtime must accept explicit repository-root, policy, and credential inputs.
-- Operators should not be required to hand-author changed-file or validation-summary arguments for autonomous runs.
-- Validation commands must come from explicit configuration rather than ad hoc prompt text.
-- Autonomous ticket workflow changes must continue to flow through MuonTickets commands.
+- The runtime accepts explicit repository-root, policy, validation-command, and credential inputs.
+- Operators do not provide changed-file sets or freeform validation summaries for autonomous runs.
+- Validation commands come from explicit CLI configuration.
+- Ticket claim, comment, and status-transition behavior continues to flow through MuonTickets commands.
 
-Planned autonomous operator controls include:
+The currently shipped command shape is:
 
-- enabling or disabling autonomous execution
-- bounding session steps and command classes
-- configuring validation commands
-- allowing or disallowing scaffold and patch materialization formats
-- controlling auto-claim, auto-comment, `needs_review` transition, and optional local commits
+```bash
+uv run higgs-agent run autonomous-ticket \
+	--repo-root . \
+	--requirements docs/architecture.md \
+	--tickets-dir tickets \
+	--guardrails config/guardrails.example.json \
+	--write-policy config/write-policy.example.json \
+	--validation-command "uv run pytest"
+```
 
-These controls are contract expectations for the later Phase 6 runtime surface.
+The current implementation supports one ready ticket per invocation and bounded directory creation plus full-file writes from the structured OpenRouter response. Broader patch and diff materialization remains a later follow-up.
+
+Autonomous telemetry is written under `.higgs/local/` and includes:
+
+- `.higgs/local/runs/<run_id>/<attempt_id>/events.ndjson`
+- `.higgs/local/runs/<run_id>/<attempt_id>/artifacts/`
+- `.higgs/local/analytics/attempt-summaries.ndjson`
+
+Blocked or review-required runs may emit `review-handoff.txt` in the attempt artifacts directory.
 
 ## Hybrid Operational Limits
 

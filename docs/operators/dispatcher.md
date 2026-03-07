@@ -31,9 +31,12 @@ The dispatcher now has a first-party CLI entrypoint for explicit review-mode run
 - Analytics reporting is exposed through the `higgs-agent analytics report` command.
 - Sample-project bootstrap is exposed through `higgs-agent bootstrap sample-project`.
 - Ticketed dispatcher execution is exposed through `higgs-agent run ticketed-project`.
+- Autonomous single-ticket execution is exposed through `higgs-agent run autonomous-ticket`.
 - The library entrypoint remains available as `higgs_agent.application.dispatch_next_ready_ticket` for integration tests and lower-level orchestration.
 
 The `run ticketed-project` command is intentionally explicit. Operators must still supply the requirement file, ticket directory, guardrails file, write-policy file, and a declared proposed change set plus validation summary.
+
+The `run autonomous-ticket` command uses the same routing, validation, and observability boundaries, but HiggsAgent now derives changed paths from the observed workspace mutations and synthesizes validation evidence from configured validation commands.
 
 ## Configuration Inputs
 
@@ -108,7 +111,8 @@ Keep these distinctions clear when reading the code or operating the system:
 - Phase 1: deterministic scan, classify, route, execute, validate, and observe
 - Phase 2: analytics aggregation and reporting over normalized outputs
 - Phase 3: optional local execution and bounded fallback on top of the same dispatcher shape
-- Later phases: adaptive dispatch and benchmarking are not implemented yet
+- Phase 6: autonomous single-ticket execution extends the pipeline to claim one ready ticket, write bounded repository changes, run validation, and produce review-ready output
+- Later phases: project-level turnkey execution is not implemented yet
 
 Operators should use the Phase 1 model as the baseline execution explanation and treat later phases as extensions of that pipeline rather than replacements.
 

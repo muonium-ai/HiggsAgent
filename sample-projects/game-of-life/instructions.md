@@ -2,31 +2,44 @@
 
 ## Purpose
 
-This file is the operator-facing runbook for using HiggsAgent as the framework and process layer while a hosted OpenRouter-backed model implements the Game of Life sample project.
+This file is the operator-facing runbook for using HiggsAgent as the framework and process layer while an agent implements the Game of Life sample project in a separate evaluation repository.
 
 Use this document when you already have the sample project copied into a fresh evaluation repository and want a step-by-step path for:
 
 - wiring HiggsAgent into that repository
+- using the currently implemented HiggsAgent CLI surface
 - configuring OpenRouter credentials
-- choosing the model in your agent runner
-- telling the agent exactly what to read and follow
+- choosing the routed model configuration
+- telling an implementation agent exactly what to read and follow
+- running ticket-by-ticket implementation in a second repository
 - knowing where execution data and analytics are written so you can verify the run afterward
 
 ## Important Boundary
 
-HiggsAgent does not currently ship a first-party end-to-end `solve this repository` runtime command.
+HiggsAgent now ships a first-party operator CLI, but it still does not ship a one-command autonomous `solve this repository` runtime.
 
 Current state of the repository:
 
-- HiggsAgent provides the framework, repository conventions, benchmark workload model, analytics pipeline, and provider abstractions.
+- HiggsAgent provides the framework, repository conventions, bootstrap flow, ticket validation wrapper, review-mode dispatcher runtime, analytics pipeline, and provider abstractions.
 - MuonTickets provides the local task system and ticket lifecycle.
-- The actual model selection and hosted execution entrypoint are controlled by the outer agent runner you use with OpenRouter.
+- The actual implementation loop is still driven by the outer coding agent or editor integration you use with OpenRouter.
 
 That means your evaluation stack has three layers:
 
 1. the sample project and its ticket board
-2. HiggsAgent as the framework reference and analytics tooling
-3. your actual agent runner or editor integration, configured to use an OpenRouter model
+2. HiggsAgent as the framework reference, CLI surface, and analytics tooling
+3. your actual coding agent or editor integration, configured to use an OpenRouter model
+
+What exists today:
+
+- `higgs-agent bootstrap sample-project` creates the evaluation-repository layout for the shipped sample project
+- `higgs-agent validate tickets` validates a MuonTickets board from the installed HiggsAgent CLI
+- `higgs-agent run ticketed-project` runs the deterministic dispatcher for the next ready ticket in explicit review mode
+- `higgs-agent analytics report` renders analytics from normalized attempt summaries
+
+What does not exist yet:
+
+- a turnkey command that autonomously edits the project, infers the changed-file set, runs tests, updates ticket lifecycle, and loops until the app is complete without an outer agent
 
 ## What The Agent Must Treat As Source Of Truth
 
@@ -65,16 +78,22 @@ evaluation-repo/
 
 You can use a different layout, but the rest of the instructions assume the paths above.
 
-## Step 1: Add HiggsAgent As A Git Submodule
+## Step 1: Create The Evaluation Repository
 
-If you are starting from scratch and want HiggsAgent to create the full evaluation-repository layout for this sample, use the supported bootstrap command from an existing HiggsAgent checkout:
+Preferred path: bootstrap from an existing HiggsAgent checkout that already has its `uv` environment synced.
 
 ```bash
-higgs-agent bootstrap sample-project ../game-of-life-eval --sample-project game-of-life
+cd /path/to/HiggsAgent
+uv sync --extra dev
+uv run higgs-agent bootstrap sample-project ../game-of-life-eval --sample-project game-of-life
 cd ../game-of-life-eval
 ```
 
-The rest of this document remains useful after bootstrap, but you can skip the manual submodule and sample-project copy steps.
+This creates the recommended layout, adds `tools/higgsagent` as a submodule, copies the Game of Life sample project, creates `.higgs/local/` directories, and validates the copied ticket board.
+
+Manual fallback: if you are not using bootstrap, create the evaluation repository yourself and then continue with the submodule flow below.
+
+## Step 2: Add HiggsAgent As A Git Submodule Manually
 
 From the root of your evaluation repository:
 
@@ -96,9 +115,10 @@ Verify the framework is present:
 ```bash
 test -f tools/higgsagent/pyproject.toml
 test -f tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py
+uv run --directory tools/higgsagent higgs-agent --help
 ```
 
-## Step 2: Install MuonTickets
+## Step 3: Choose How To Run MuonTickets
 
 You have two valid options.
 
@@ -134,7 +154,7 @@ uv run --directory tools/higgsagent python3 tools/higgsagent/tickets/mt/muontick
 
 Both options are acceptable. Pick one and stay consistent throughout a model comparison run.
 
-## Step 3: Validate The Local Game Of Life Ticket Board
+## Step 4: Validate The Local Game Of Life Ticket Board
 
 From the sample project root:
 
@@ -148,13 +168,12 @@ mt validate
 Using the Python CLI:
 
 ```bash
-cd sample-projects/game-of-life
-uv run --directory ../../tools/higgsagent python3 ../../tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py validate
+uv run --directory tools/higgsagent higgs-agent validate tickets --repo-root sample-projects/game-of-life
 ```
 
 If validation fails, do not start the model run yet.
 
-## Step 4: Configure OpenRouter Credentials
+## Step 5: Configure OpenRouter Credentials
 
 Create a local environment file in the evaluation repository root.
 
@@ -192,7 +211,7 @@ export HIGGS_WRITE_MODE=review
 
 Do not commit `.env` files with real keys.
 
-## Step 5: Choose The Model
+## Step 6: Choose The Model
 
 HiggsAgent now exposes a first-party model-selection surface through the guardrails config used by the routing policy.
 
@@ -237,7 +256,7 @@ Examples of model identifiers you might record:
 
 Use the exact model string reported by OpenRouter or by your agent runner.
 
-## Step 6: Recommended Operating Mode
+## Step 7: Recommended Operating Mode
 
 Start with a single-agent baseline first.
 
@@ -249,7 +268,121 @@ Why:
 
 Only after the single-agent baseline is stable should you move to a coordinator-plus-workers layout.
 
-## Step 7: Exact Instructions To Give The Agent
+## Step 8: Step-By-Step Build Flow For An Agent In A Different Repository
+
+Use this sequence when the implementation agent is operating in the separate evaluation repository instead of inside the HiggsAgent framework repository.
+
+1. Create or bootstrap the evaluation repository.
+
+  Preferred:
+
+  ```bash
+  cd /path/to/HiggsAgent
+  uv run higgs-agent bootstrap sample-project ../game-of-life-eval --sample-project game-of-life
+  cd ../game-of-life-eval
+  ```
+
+2. Sync the HiggsAgent submodule environment.
+
+  ```bash
+  uv run --directory tools/higgsagent higgs-agent --help
+  ```
+
+  If that command fails because dependencies are missing:
+
+  ```bash
+  uv sync --directory tools/higgsagent --extra dev
+  uv run --directory tools/higgsagent higgs-agent --help
+  ```
+
+3. Load credentials.
+
+  ```bash
+  set -a
+  source .env
+  set +a
+  ```
+
+4. Validate the Game of Life ticket board.
+
+  ```bash
+  uv run --directory tools/higgsagent higgs-agent validate tickets --repo-root sample-projects/game-of-life
+  ```
+
+5. Read the project sources of truth in this exact order.
+
+  - `sample-projects/game-of-life/requirements.md`
+  - `sample-projects/game-of-life/tickets/`
+  - `sample-projects/game-of-life/instructions.md`
+  - `tools/higgsagent/docs/`
+
+6. Claim one ready ticket on the sample-project board and inspect it before writing code.
+
+  Using the native binary:
+
+  ```bash
+  cd sample-projects/game-of-life
+  mt ls
+  mt claim T-000002 --owner coordinator
+  mt show T-000002
+  cd ../..
+  ```
+
+  Using the Python CLI:
+
+  ```bash
+  uv run --directory tools/higgsagent python3 tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py ls --tickets-dir sample-projects/game-of-life/tickets
+  uv run --directory tools/higgsagent python3 tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py claim T-000002 --owner coordinator --tickets-dir sample-projects/game-of-life/tickets
+  uv run --directory tools/higgsagent python3 tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py show T-000002 --tickets-dir sample-projects/game-of-life/tickets
+  ```
+
+7. Implement only the claimed ticket inside the sample-project repository surfaces, not inside `tools/higgsagent`.
+
+  Typical target paths:
+
+  - `src/`
+  - `tests/`
+  - `README.md`
+  - `pyproject.toml` for the sample project only if the ticket requires it
+
+8. Run the narrowest relevant tests for the ticket slice.
+
+  Example:
+
+  ```bash
+  uv run pytest tests
+  ```
+
+9. Record the proposed change set and validation summary, then run the explicit HiggsAgent dispatcher surface if you want an inspectable dispatcher attempt for the ticket.
+
+  Template:
+
+  ```bash
+  uv run --directory tools/higgsagent higgs-agent run ticketed-project \
+    --repo-root sample-projects/game-of-life \
+    --requirements sample-projects/game-of-life/requirements.md \
+    --tickets-dir sample-projects/game-of-life/tickets \
+    --guardrails tools/higgsagent/config/guardrails.example.json \
+    --write-policy tools/higgsagent/config/write-policy.example.json \
+    --changed-file src/game_of_life/board.py:40:0 \
+    --validation-summary "uv run pytest tests passed for the claimed ticket"
+  ```
+
+  This command does not mutate the repository automatically. It records an explicit dispatcher attempt using the next ready ticket plus the change set and validation summary you provide.
+
+10. Update the sample-project ticket lifecycle.
+
+  Recommended sequence:
+
+  - add a progress comment
+  - move the ticket to `needs_review`
+  - re-run board validation
+
+11. Repeat one ticket at a time until the Game of Life project is complete.
+
+12. After the run, inspect `.higgs/local/analytics/attempt-summaries.ndjson` and the attempt-level run artifacts before comparing models or declaring success.
+
+## Step 9: Exact Instructions To Give The Agent
 
 If you want a first-party HiggsAgent execution surface instead of driving the run entirely through an external prompt UI, use `higgs-agent run ticketed-project` with explicit repository inputs, a declared proposed change set, and a validation summary.
 
@@ -257,7 +390,7 @@ Template:
 
 ```bash
 uv run --directory tools/higgsagent higgs-agent run ticketed-project \
-  --repo-root . \
+  --repo-root sample-projects/game-of-life \
   --requirements sample-projects/game-of-life/requirements.md \
   --tickets-dir sample-projects/game-of-life/tickets \
   --guardrails tools/higgsagent/config/guardrails.example.json \
@@ -273,7 +406,7 @@ When the command completes, inspect the concrete local outputs under `.higgs/loc
 Give the coding agent a prompt like this:
 
 ```text
-You are implementing the Game of Life sample project in sample-projects/game-of-life.
+You are implementing the Game of Life sample project in a separate evaluation repository.
 
 Read and follow these sources in order:
 1. sample-projects/game-of-life/requirements.md
@@ -284,6 +417,7 @@ Read and follow these sources in order:
 Rules:
 - Treat the Game of Life sample project as the product to build.
 - Treat the local ticket board under sample-projects/game-of-life/tickets as the task source of truth.
+- Work only in the evaluation repository surfaces for the sample project unless the task explicitly requires framework work.
 - Use MuonTickets commands for claim, comment, status changes, and validation.
 - Do not hand-edit ticket lifecycle metadata.
 - Respect dependencies between tickets.
@@ -291,12 +425,13 @@ Rules:
 - Run tests as implementation progresses.
 - Keep the project reproducible with uv and pytest.
 - Do not modify the HiggsAgent framework unless the evaluation explicitly requires framework changes.
+- After each completed slice, record the validation summary and inspect `.higgs/local` telemetry if you run `higgs-agent run ticketed-project`.
 
 Goal:
 Complete the Game of Life sample project against the requirement file and ticket graph.
 ```
 
-## Step 8: Ticket Workflow During The Run
+## Step 10: Ticket Workflow During The Run
 
 From `sample-projects/game-of-life/`:
 
@@ -311,9 +446,9 @@ mt show T-000002
 Using the Python CLI:
 
 ```bash
-uv run --directory ../../tools/higgsagent python3 ../../tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py ls
-uv run --directory ../../tools/higgsagent python3 ../../tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py claim T-000002 --owner coordinator
-uv run --directory ../../tools/higgsagent python3 ../../tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py show T-000002
+uv run --directory tools/higgsagent python3 tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py ls --tickets-dir sample-projects/game-of-life/tickets
+uv run --directory tools/higgsagent python3 tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py claim T-000002 --owner coordinator --tickets-dir sample-projects/game-of-life/tickets
+uv run --directory tools/higgsagent python3 tools/higgsagent/tickets/mt/muontickets/muontickets/mt.py show T-000002 --tickets-dir sample-projects/game-of-life/tickets
 ```
 
 Recommended pattern:
@@ -326,7 +461,7 @@ Recommended pattern:
 6. move the ticket to `needs_review`
 7. validate the board again
 
-## Step 9: Where Execution Data And Analytics Are Stored
+## Step 11: Where Execution Data And Analytics Are Stored
 
 HiggsAgent’s storage contract separates committed repository state from local execution artifacts.
 
@@ -370,7 +505,7 @@ These are local inspection paths and should not be committed.
 - export-friendly analytics snapshots
 - use these when you want to compare or archive sanitized summaries outside the raw local run directory
 
-## Step 10: What To Inspect To Verify A Run
+## Step 12: What To Inspect To Verify A Run
 
 After a model run, inspect these in order:
 
@@ -388,14 +523,14 @@ Practical checks:
 - which provider and model identifiers were recorded in the attempt summaries?
 - were there retries, provider failures, or validation failures?
 
-## Step 11: How To Read Analytics With HiggsAgent
+## Step 13: How To Read Analytics With HiggsAgent
 
 HiggsAgent currently exposes analytics reporting through its CLI.
 
 From the evaluation repository root, adjust the paths as needed:
 
 ```bash
-uv run --directory tools/higgsagent python3 tools/higgsagent/src/higgs_agent/cli.py analytics report \
+uv run --directory tools/higgsagent higgs-agent analytics report \
   --attempt-summaries .higgs/local/analytics/attempt-summaries.ndjson \
   --tickets-dir sample-projects/game-of-life/tickets \
   --group-by provider \
@@ -406,15 +541,15 @@ uv run --directory tools/higgsagent python3 tools/higgsagent/src/higgs_agent/cli
 For JSON output:
 
 ```bash
-uv run --directory tools/higgsagent python3 tools/higgsagent/src/higgs_agent/cli.py analytics report \
+uv run --directory tools/higgsagent higgs-agent analytics report \
   --attempt-summaries .higgs/local/analytics/attempt-summaries.ndjson \
   --tickets-dir sample-projects/game-of-life/tickets \
   --format json
 ```
 
-If your environment runs HiggsAgent as an installed package, you can also invoke the equivalent package entrypoint instead of calling the file path directly.
+If you have installed HiggsAgent into a different environment, use the equivalent installed `higgs-agent analytics report` command from that environment instead.
 
-## Step 12: Committed Versus Local State
+## Step 14: Committed Versus Local State
 
 What should remain committed in git:
 
@@ -435,7 +570,7 @@ What should remain local-only:
 - full event streams
 - debug traces
 
-## Recommended Comparison Discipline
+## Step 15: Recommended Comparison Discipline
 
 For fair model comparisons:
 
@@ -446,7 +581,7 @@ For fair model comparisons:
 5. record the exact OpenRouter model string
 6. compare ticket completion, test pass rate, and resulting diffs
 
-## Common Mistakes
+## Step 16: Common Mistakes
 
 - letting the agent modify the HiggsAgent framework instead of the sample project
 - mixing the main repository ticket board with the sample-project ticket board
@@ -454,8 +589,9 @@ For fair model comparisons:
 - changing multiple evaluation variables at once
 - committing local telemetry or raw provider data
 - assuming HiggsAgent currently provides a turnkey project-solving CLI
+- running the dispatcher against the wrong repo root instead of the sample-project evaluation repository
 
-## Minimal Operator Checklist
+## Step 17: Minimal Operator Checklist
 
 - [ ] HiggsAgent added as `tools/higgsagent` submodule
 - [ ] HiggsAgent environment synced with `uv`

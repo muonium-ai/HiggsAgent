@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import jsonschema
@@ -262,6 +263,79 @@ def test_aggregate_attempt_summaries_handles_local_partial_usage_without_billing
     assert report.records[0]["source"]["export_safe"] is True
 
 
+def test_bounded_aggregation_excludes_rows_with_missing_or_unusable_timestamps(tmp_path: Path) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+    _write_ticket(
+        tickets_dir / "T-000210.md",
+        ticket_id="T-000210",
+        ticket_type="code",
+        priority="p1",
+        platform="repo",
+        complexity="medium",
+    )
+    _write_ticket(
+        tickets_dir / "T-000211.md",
+        ticket_id="T-000211",
+        ticket_type="code",
+        priority="p1",
+        platform="repo",
+        complexity="medium",
+    )
+    _write_ticket(
+        tickets_dir / "T-000212.md",
+        ticket_id="T-000212",
+        ticket_type="code",
+        priority="p1",
+        platform="repo",
+        complexity="medium",
+    )
+
+    summaries = (
+        {
+            "ticket_id": "T-000210",
+            "started_at": "2026-03-06T12:00:00Z",
+            "ended_at": "2026-03-06T12:00:01Z",
+            "final_result": "succeeded",
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-4",
+            "usage": {"cost_usd": 0.01},
+        },
+        {
+            "ticket_id": "T-000211",
+            "ended_at": "2026-03-06T12:05:01Z",
+            "final_result": "succeeded",
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-4",
+            "usage": {"cost_usd": 0.02},
+        },
+        {
+            "ticket_id": "T-000212",
+            "started_at": 123,
+            "ended_at": "2026-03-06T12:10:01Z",
+            "final_result": "succeeded",
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-4",
+            "usage": {"cost_usd": 0.03},
+        },
+    )
+
+    metadata_index = build_ticket_metadata_index(tickets_dir)
+    report = aggregate_attempt_summaries(
+        summaries,
+        metadata_index,
+        AnalyticsFilter(
+            start_at=datetime(2026, 3, 6, 11, 0, tzinfo=UTC),
+            end_at=datetime(2026, 3, 6, 13, 0, tzinfo=UTC),
+            group_by=("provider",),
+        ),
+    )
+
+    assert len(report.records) == 1
+    assert report.records[0]["metrics"]["attempts_total"] == 1
+    assert report.records[0]["metrics"]["cost_usd_total"] == 0.01
+
+
 def test_cli_report_fails_for_missing_attempt_summaries_file(tmp_path: Path) -> None:
     tickets_dir = tmp_path / "tickets"
     tickets_dir.mkdir()
@@ -277,6 +351,89 @@ def test_cli_report_fails_for_missing_attempt_summaries_file(tmp_path: Path) -> 
                 str(tickets_dir),
             ]
         )
+
+
+def test_cli_report_json_excludes_rows_with_incomplete_timestamps_when_bounded(
+    tmp_path: Path, capsys
+) -> None:
+    tickets_dir = tmp_path / "tickets"
+    tickets_dir.mkdir()
+    _write_ticket(
+        tickets_dir / "T-000220.md",
+        ticket_id="T-000220",
+        ticket_type="code",
+        priority="p1",
+        platform="repo",
+        complexity="medium",
+    )
+    _write_ticket(
+        tickets_dir / "T-000221.md",
+        ticket_id="T-000221",
+        ticket_type="code",
+        priority="p1",
+        platform="repo",
+        complexity="medium",
+    )
+
+    attempt_summaries_path = tmp_path / "attempt-summaries.ndjson"
+    attempt_summaries_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "run_id": "run-valid",
+                        "attempt_id": "attempt-valid",
+                        "ticket_id": "T-000220",
+                        "started_at": "2026-03-06T12:00:00Z",
+                        "ended_at": "2026-03-06T12:00:01Z",
+                        "final_result": "succeeded",
+                        "provider": "openrouter",
+                        "model": "anthropic/claude-sonnet-4",
+                        "usage": {"cost_usd": 0.01},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "run_id": "run-missing-start",
+                        "attempt_id": "attempt-missing-start",
+                        "ticket_id": "T-000221",
+                        "ended_at": "2026-03-06T12:00:02Z",
+                        "final_result": "succeeded",
+                        "provider": "openrouter",
+                        "model": "anthropic/claude-sonnet-4",
+                        "usage": {"cost_usd": 0.02},
+                    }
+                ),
+            ]
+        )
+        + "\n"
+    )
+
+    main(
+        [
+            "analytics",
+            "report",
+            "--attempt-summaries",
+            str(attempt_summaries_path),
+            "--tickets-dir",
+            str(tickets_dir),
+            "--start-at",
+            "2026-03-06T11:00:00Z",
+            "--end-at",
+            "2026-03-06T13:00:00Z",
+            "--group-by",
+            "provider",
+            "--format",
+            "json",
+        ]
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert len(output) == 1
+    assert output[0]["metrics"]["attempts_total"] == 1
+    assert output[0]["metrics"]["cost_usd_total"] == 0.01
 
 
 def test_cli_report_fails_for_invalid_tickets_dir(tmp_path: Path) -> None:

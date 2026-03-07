@@ -246,12 +246,16 @@ def _matches_filter(row: Mapping[str, Any], analytics_filter: AnalyticsFilter) -
             return False
 
     started_at = row.get("started_at")
-    if analytics_filter.start_at is not None and isinstance(started_at, datetime):
+    if analytics_filter.start_at is not None:
+        if not isinstance(started_at, datetime):
+            return False
         if started_at < analytics_filter.start_at:
             return False
 
     ended_at = row.get("ended_at")
-    if analytics_filter.end_at is not None and isinstance(ended_at, datetime):
+    if analytics_filter.end_at is not None:
+        if not isinstance(ended_at, datetime):
+            return False
         if ended_at > analytics_filter.end_at:
             return False
 

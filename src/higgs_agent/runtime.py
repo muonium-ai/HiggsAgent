@@ -581,7 +581,8 @@ def run_autonomous_ticket(
         except RuntimeConfigError as exc:
             execution_result = _mark_execution_failed(
                 execution_result,
-                error_kind="materialization_failure",
+                error_kind="validation",
+                decision_reason="materialization_failure",
                 message=str(exc),
             )
 
@@ -1257,7 +1258,8 @@ def _evaluate_autonomous_write_request(
     if execution_result.status != "succeeded":
         return ValidationDecision(
             decision="rejected",
-            reason=execution_result.attempt_summary.get("error", {}).get("kind", "executor_failed"),
+            reason=execution_result.metadata.get("failure_reason")
+            or execution_result.attempt_summary.get("error", {}).get("kind", "executor_failed"),
             diagnostics=(str(execution_result.attempt_summary.get("error", {}).get("message", "executor failed")),),
             changed_paths=tuple(change.path for change in changed_files),
             requires_human_review=False,
@@ -1333,6 +1335,7 @@ def _mark_execution_failed(
     execution_result: ProviderExecutionResult,
     *,
     error_kind: str,
+    decision_reason: str | None = None,
     message: str,
 ) -> ProviderExecutionResult:
     error = {"kind": error_kind, "message": message, "retryable": False}
@@ -1343,6 +1346,10 @@ def _mark_execution_failed(
         execution_result,
         status="failed",
         attempt_summary=updated_summary,
+        metadata={
+            **execution_result.metadata,
+            **({"failure_reason": decision_reason} if decision_reason is not None else {}),
+        },
     )
     return _append_event(
         updated_result,

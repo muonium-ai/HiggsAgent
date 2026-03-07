@@ -1,0 +1,14 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "{\"summary\": \"Attempted ambiguous patch\", \"diffs\": [{\"path\": \"src/game_of_life/engine.py\", \"before\": \"return board\", \"after\": \"return []\"}]}"
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 26,
+    "total_tokens": 40
+  }
+}

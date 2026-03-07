@@ -1,0 +1,14 @@
+{
+  "choices": [
+    {
+      "message": {
+        "content": "{\"summary\": \"Created Game of Life scaffold\", \"scaffold\": {\"tree\": [{\"type\": \"directory\", \"path\": \"src\", \"children\": [{\"type\": \"directory\", \"path\": \"game_of_life\", \"children\": [{\"type\": \"file\", \"path\": \"__init__.py\", \"content\": \"\\\"\\\"\\\"Game of Life package.\\\"\\\"\\\"\\n\"}, {\"type\": \"file\", \"path\": \"engine.py\", \"content\": \"def next_state(board: list[str]) -> list[str]:\\n    return board\\n\"}]}]}, {\"type\": \"directory\", \"path\": \"tests\", \"children\": [{\"type\": \"file\", \"path\": \"test_engine.py\", \"content\": \"from game_of_life.engine import next_state\\n\\n\\ndef test_next_state_preserves_board():\\n    assert next_state([\\\".#.\\\"]) == [\\\".#.\\\"]\\n\"}]}, {\"type\": \"directory\", \"path\": \"fixtures\", \"children\": [{\"type\": \"file\", \"path\": \"blinker.txt\", \"content\": \".#.\\n.#.\\n.#.\\n\"}]}]}}"
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 18,
+    "completion_tokens": 44,
+    "total_tokens": 62
+  }
+}

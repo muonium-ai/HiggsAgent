@@ -67,6 +67,15 @@ You can use a different layout, but the rest of the instructions assume the path
 
 ## Step 1: Add HiggsAgent As A Git Submodule
 
+If you are starting from scratch and want HiggsAgent to create the full evaluation-repository layout for this sample, use the supported bootstrap command from an existing HiggsAgent checkout:
+
+```bash
+higgs-agent bootstrap sample-project ../game-of-life-eval --sample-project game-of-life
+cd ../game-of-life-eval
+```
+
+The rest of this document remains useful after bootstrap, but you can skip the manual submodule and sample-project copy steps.
+
 From the root of your evaluation repository:
 
 ```bash

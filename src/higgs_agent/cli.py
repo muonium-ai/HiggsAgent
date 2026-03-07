@@ -15,6 +15,7 @@ from higgs_agent.analytics import (
     load_attempt_summaries,
     render_report_table,
 )
+from higgs_agent.bootstrap import BootstrapError, available_sample_projects, bootstrap_sample_project
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -23,6 +24,10 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "analytics" and args.analytics_command == "report":
         _run_analytics_report(args)
+        return
+
+    if args.command == "bootstrap" and args.bootstrap_command == "sample-project":
+        _run_bootstrap_sample_project(args)
         return
 
     raise SystemExit("HiggsAgent runtime is not implemented yet.")
@@ -34,6 +39,23 @@ def _build_parser() -> argparse.ArgumentParser:
 
     analytics_parser = subparsers.add_parser("analytics")
     analytics_subparsers = analytics_parser.add_subparsers(dest="analytics_command")
+
+    bootstrap_parser = subparsers.add_parser("bootstrap")
+    bootstrap_subparsers = bootstrap_parser.add_subparsers(dest="bootstrap_command")
+
+    sample_project_choices = available_sample_projects()
+    sample_project_parser = bootstrap_subparsers.add_parser("sample-project")
+    sample_project_parser.add_argument("target_dir", type=Path)
+    sample_project_parser.add_argument(
+        "--sample-project",
+        default="game-of-life",
+        choices=list(sample_project_choices) or None,
+    )
+    sample_project_parser.add_argument(
+        "--higgsagent-repo-url",
+        default="https://github.com/muonium-ai/HiggsAgent.git",
+    )
+    sample_project_parser.add_argument("--force", action="store_true")
 
     report_parser = analytics_subparsers.add_parser("report")
     report_parser.add_argument(
@@ -104,6 +126,22 @@ def _run_analytics_report(args: argparse.Namespace) -> None:
         print(report.to_json())
         return
     print(render_report_table(report))
+
+
+def _run_bootstrap_sample_project(args: argparse.Namespace) -> None:
+    try:
+        result = bootstrap_sample_project(
+            target_dir=args.target_dir,
+            sample_project=args.sample_project,
+            higgsagent_repo_url=args.higgsagent_repo_url,
+            force=args.force,
+        )
+    except BootstrapError as exc:
+        raise SystemExit(f"bootstrap sample-project failed: {exc}") from exc
+
+    print(f"created evaluation repo at {result.target_dir}")
+    print(f"sample project: {result.sample_project_dir}")
+    print(f"higgsagent submodule: {result.higgsagent_submodule_dir}")
 
 
 def _parse_optional_datetime(value: str | None, *, flag_name: str) -> datetime | None:

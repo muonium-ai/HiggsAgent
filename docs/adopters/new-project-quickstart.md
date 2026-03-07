@@ -24,6 +24,16 @@ It is not a one-command scaffold. HiggsAgent currently provides reference archit
 
 ## Recommended Bootstrap Flow
 
+If you are starting from a shipped sample project, prefer the first-party bootstrap command instead of reconstructing the repository layout by hand:
+
+```bash
+higgs-agent bootstrap sample-project ../my-evaluation-repo --sample-project game-of-life
+```
+
+The command initializes the target Git repository, copies the sample-project assets, adds `tools/higgsagent` as a submodule, creates the local `.higgs/` directories, and validates the copied ticket board.
+
+Use the manual flow below when you are creating a fully custom repository instead of one of the shipped sample-project layouts.
+
 1. Create the repository root and initialize Git.
 
    ```bash

@@ -690,6 +690,15 @@ def persist_dispatch_outcome(*, repo_root: Path, outcome: DispatchOutcome) -> Di
                 repo_root=repo_root,
             )
         )
+    materialization_plan = outcome.execution_result.metadata.get("materialization_plan")
+    if materialization_plan is not None:
+        artifact_refs.append(
+            _write_text_artifact(
+                artifacts_dir / "materialization-plan.json",
+                json.dumps(materialization_plan, indent=2, sort_keys=True) + "\n",
+                repo_root=repo_root,
+            )
+        )
 
     updated_events = list(outcome.execution_result.events)
     if artifact_refs:
@@ -834,6 +843,10 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
     summary = payload.get("summary", "")
     if not isinstance(summary, str):
         raise RuntimeConfigError("autonomous response 'summary' must be a string")
+    scaffold_payload = payload.get("scaffold")
+    if scaffold_payload is not None and not isinstance(scaffold_payload, dict):
+        raise RuntimeConfigError("autonomous response 'scaffold' must be an object when present")
+
     raw_directories = payload.get("directories", [])
     if raw_directories is None:
         raw_directories = []
@@ -850,12 +863,125 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
         if not isinstance(raw_write, dict):
             raise RuntimeConfigError("autonomous response write entries must be objects")
         path = raw_write.get("path")
-        content = raw_write.get("content")
+        content = raw_write.get("content", raw_write.get("text"))
         if not isinstance(path, str) or not isinstance(content, str):
             raise RuntimeConfigError("autonomous response writes require string 'path' and 'content'")
         writes.append(AutonomousFileWrite(path=path, content=content))
 
-    return AutonomousPlan(summary=summary, directories=tuple(raw_directories), writes=tuple(writes))
+    directories = list(raw_directories)
+    if scaffold_payload is not None:
+        scaffold_directories, scaffold_writes = _parse_scaffold_payload(scaffold_payload)
+        directories.extend(scaffold_directories)
+        writes.extend(scaffold_writes)
+
+    _reject_duplicate_materialization_paths(directories, writes)
+
+    if not directories and not writes:
+        raise RuntimeConfigError("autonomous response did not describe any scaffold directories or file writes")
+
+    return AutonomousPlan(summary=summary, directories=tuple(directories), writes=tuple(writes))
+
+
+def _parse_scaffold_payload(payload: dict[str, object]) -> tuple[list[str], list[AutonomousFileWrite]]:
+    raw_directories = payload.get("directories", [])
+    if raw_directories is None:
+        raw_directories = []
+    if not isinstance(raw_directories, list) or not all(isinstance(item, str) for item in raw_directories):
+        raise RuntimeConfigError("autonomous scaffold 'directories' must be a list of strings")
+
+    raw_files = payload.get("files", payload.get("writes", []))
+    if raw_files is None:
+        raw_files = []
+    if not isinstance(raw_files, list):
+        raise RuntimeConfigError("autonomous scaffold 'files' must be a list when present")
+
+    writes: list[AutonomousFileWrite] = []
+    for raw_file in raw_files:
+        if not isinstance(raw_file, dict):
+            raise RuntimeConfigError("autonomous scaffold file entries must be objects")
+        path = raw_file.get("path")
+        content = raw_file.get("content", raw_file.get("text"))
+        if not isinstance(path, str) or not isinstance(content, str):
+            raise RuntimeConfigError("autonomous scaffold file entries require string 'path' and 'content'")
+        writes.append(AutonomousFileWrite(path=path, content=content))
+
+    raw_tree = payload.get("tree", payload.get("entries", []))
+    if raw_tree is None:
+        raw_tree = []
+    if not isinstance(raw_tree, list):
+        raise RuntimeConfigError("autonomous scaffold 'tree' must be a list when present")
+
+    directories = list(raw_directories)
+    for entry in raw_tree:
+        entry_directories, entry_writes = _parse_scaffold_tree_entry(entry, parent_prefix=Path("."))
+        directories.extend(entry_directories)
+        writes.extend(entry_writes)
+    return directories, writes
+
+
+def _parse_scaffold_tree_entry(entry: object, *, parent_prefix: Path) -> tuple[list[str], list[AutonomousFileWrite]]:
+    if not isinstance(entry, dict):
+        raise RuntimeConfigError("autonomous scaffold tree entries must be objects")
+    entry_type = entry.get("type")
+    path_text = entry.get("path")
+    if not isinstance(entry_type, str) or entry_type not in {"directory", "file"}:
+        raise RuntimeConfigError("autonomous scaffold tree entries require type 'directory' or 'file'")
+    if not isinstance(path_text, str) or not path_text:
+        raise RuntimeConfigError("autonomous scaffold tree entries require a non-empty string 'path'")
+
+    relative_path = _normalize_relative_path(str(parent_prefix / path_text))
+    children = entry.get("children", [])
+    if children is None:
+        children = []
+
+    if entry_type == "directory":
+        if "content" in entry or "text" in entry:
+            raise RuntimeConfigError("directory scaffold entries must not declare file content")
+        if not isinstance(children, list):
+            raise RuntimeConfigError("directory scaffold children must be a list")
+        directories = [str(relative_path).replace("\\", "/")]
+        writes: list[AutonomousFileWrite] = []
+        for child in children:
+            child_directories, child_writes = _parse_scaffold_tree_entry(child, parent_prefix=relative_path)
+            directories.extend(child_directories)
+            writes.extend(child_writes)
+        return directories, writes
+
+    if children:
+        raise RuntimeConfigError("file scaffold entries must not declare children")
+    content = entry.get("content", entry.get("text"))
+    if not isinstance(content, str):
+        raise RuntimeConfigError("file scaffold entries require string 'content' or 'text'")
+    return [], [AutonomousFileWrite(path=str(relative_path).replace("\\", "/"), content=content)]
+
+
+def _reject_duplicate_materialization_paths(
+    directories: list[str],
+    writes: list[AutonomousFileWrite],
+) -> None:
+    duplicate_directories = _duplicate_items(directories)
+    if duplicate_directories:
+        raise RuntimeConfigError(
+            f"autonomous scaffold declared duplicate directories: {', '.join(sorted(duplicate_directories))}"
+        )
+
+    write_paths = [write.path for write in writes]
+    duplicate_writes = _duplicate_items(write_paths)
+    if duplicate_writes:
+        raise RuntimeConfigError(
+            f"autonomous scaffold declared duplicate file writes: {', '.join(sorted(duplicate_writes))}"
+        )
+
+
+def _duplicate_items(items: list[str]) -> set[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for item in items:
+        if item in seen:
+            duplicates.add(item)
+            continue
+        seen.add(item)
+    return duplicates
 
 
 def _extract_json_payload(output_text: str) -> object:
@@ -894,7 +1020,17 @@ def _apply_autonomous_plan(
     execution_result: ProviderExecutionResult,
     plan: AutonomousPlan,
 ) -> tuple[tuple[ProposedFileChange, ...], ProviderExecutionResult]:
-    updated_result = execution_result
+    updated_result = replace(
+        execution_result,
+        metadata={
+            **execution_result.metadata,
+            "materialization_plan": {
+                "summary": plan.summary,
+                "directories": list(plan.directories),
+                "writes": [write.path for write in plan.writes],
+            },
+        },
+    )
     for directory in plan.directories:
         relative_dir = _normalize_relative_path(directory)
         (repo_root / relative_dir).mkdir(parents=True, exist_ok=True)

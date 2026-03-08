@@ -842,12 +842,24 @@ def _collect_workspace_snapshot(
 ) -> tuple[dict[str, str], ...]:
     snapshot: list[dict[str, str]] = []
     ignored_roots = {repo_root / ".git", repo_root / ".higgs", tickets_dir.resolve()}
-    for path in sorted(repo_root.rglob("*")):
+    ignored_names = {".venv", ".pytest_cache", "__pycache__"}
+    prioritized_roots = ("src/", "tests/", "fixtures/", "README.md", "pyproject.toml", "requirements.md", "instructions.md")
+
+    def _snapshot_sort_key(path: Path) -> tuple[int, str]:
+        relative = str(path.relative_to(repo_root)).replace("\\", "/")
+        priority = 1
+        if any(relative == root or relative.startswith(root) for root in prioritized_roots):
+            priority = 0
+        return priority, relative
+
+    for path in sorted(repo_root.rglob("*"), key=_snapshot_sort_key):
         if len(snapshot) >= max_files:
             break
         if not path.is_file():
             continue
         if any(parent == ignored_root for ignored_root in ignored_roots for parent in [path, *path.parents]):
+            continue
+        if any(name in ignored_names for name in path.parts):
             continue
         try:
             content = path.read_text()
@@ -899,7 +911,9 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
             raise RuntimeConfigError("autonomous response writes require string 'path' and 'content'")
         writes.append(AutonomousFileWrite(path=path, content=content))
 
-    patches = _parse_autonomous_patch_entries(raw_patches, context_label="response")
+    patches = _coalesce_autonomous_patches(
+        _parse_autonomous_patch_entries(raw_patches, context_label="response")
+    )
 
     directories = list(raw_directories)
     if scaffold_payload is not None:
@@ -1035,19 +1049,6 @@ def _reject_duplicate_materialization_paths(
             f"autonomous scaffold declared duplicate file writes: {', '.join(sorted(duplicate_writes))}"
         )
 
-    patch_paths = [str(_normalize_relative_path(patch.path)).replace("\\", "/") for patch in patches]
-    duplicate_patches = _duplicate_items(patch_paths)
-    if duplicate_patches:
-        raise RuntimeConfigError(
-            f"autonomous scaffold declared duplicate file patches: {', '.join(sorted(duplicate_patches))}"
-        )
-
-    overlapping_paths = sorted(set(write_paths).intersection(patch_paths))
-    if overlapping_paths:
-        raise RuntimeConfigError(
-            f"autonomous scaffold declared overlapping write and patch targets: {', '.join(overlapping_paths)}"
-        )
-
 
 def _duplicate_items(items: list[str]) -> set[str]:
     seen: set[str] = set()
@@ -1058,6 +1059,22 @@ def _duplicate_items(items: list[str]) -> set[str]:
             continue
         seen.add(item)
     return duplicates
+
+
+def _coalesce_autonomous_patches(patches: list[AutonomousFilePatch]) -> list[AutonomousFilePatch]:
+    unique_patches: list[AutonomousFilePatch] = []
+    seen: set[tuple[str, str, str]] = set()
+    for patch in patches:
+        key = (
+            str(_normalize_relative_path(patch.path)).replace("\\", "/"),
+            patch.before,
+            patch.after,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_patches.append(patch)
+    return unique_patches
 
 
 def _extract_json_payload(output_text: str) -> object:
@@ -1121,7 +1138,7 @@ def _apply_autonomous_plan(
             payload={"path": str(relative_dir).replace("\\", "/")},
         )
 
-    changed_files: list[ProposedFileChange] = []
+    changed_files: dict[str, ProposedFileChange] = {}
     for write in plan.writes:
         relative_path = _normalize_repo_relative_path(repo_root, write.path)
         absolute_path = repo_root / relative_path
@@ -1131,13 +1148,11 @@ def _apply_autonomous_plan(
         if before_content == write.content:
             continue
         additions, deletions = _line_diff_stats(before_content or "", write.content)
-        changed_files.append(
-            ProposedFileChange(
-                path=str(relative_path).replace("\\", "/"),
-                additions=additions,
-                deletions=deletions,
-                is_binary=False,
-            )
+        _record_changed_file(
+            changed_files,
+            path=str(relative_path).replace("\\", "/"),
+            additions=additions,
+            deletions=deletions,
         )
         updated_result = _append_event(
             updated_result,
@@ -1150,31 +1165,39 @@ def _apply_autonomous_plan(
         relative_path = _normalize_repo_relative_path(repo_root, patch.path)
         absolute_path = repo_root / relative_path
         if not absolute_path.exists():
-            raise RuntimeConfigError(
-                f"autonomous patch target does not exist: {str(relative_path).replace('\\', '/')}"
+            updated_result = _append_event(
+                updated_result,
+                event_type="file.patch_skipped",
+                status="failed",
+                payload={
+                    "path": str(relative_path).replace("\\", "/"),
+                    "reason": "target_missing",
+                },
             )
+            continue
         before_content = absolute_path.read_text()
-        match_count = before_content.count(patch.before)
-        if match_count == 0:
-            raise RuntimeConfigError(
-                f"autonomous patch target did not contain the expected text: {str(relative_path).replace('\\', '/')}"
+        patch_result = _apply_autonomous_patch(relative_path, before_content, patch)
+        if patch_result is None:
+            updated_result = _append_event(
+                updated_result,
+                event_type="file.patch_skipped",
+                status="failed",
+                payload={
+                    "path": str(relative_path).replace("\\", "/"),
+                    "reason": "target_drift_or_ambiguous",
+                },
             )
-        if match_count > 1:
-            raise RuntimeConfigError(
-                f"autonomous patch target matched multiple locations and is ambiguous: {str(relative_path).replace('\\', '/')}"
-            )
-        after_content = before_content.replace(patch.before, patch.after, 1)
+            continue
+        after_content, mode = patch_result
         absolute_path.write_text(after_content)
         if before_content == after_content:
             continue
         additions, deletions = _line_diff_stats(before_content, after_content)
-        changed_files.append(
-            ProposedFileChange(
-                path=str(relative_path).replace("\\", "/"),
-                additions=additions,
-                deletions=deletions,
-                is_binary=False,
-            )
+        _record_changed_file(
+            changed_files,
+            path=str(relative_path).replace("\\", "/"),
+            additions=additions,
+            deletions=deletions,
         )
         updated_result = _append_event(
             updated_result,
@@ -1182,11 +1205,96 @@ def _apply_autonomous_plan(
             status="succeeded",
             payload={
                 "path": str(relative_path).replace("\\", "/"),
-                "mode": "exact_replace",
+                "mode": mode,
             },
         )
 
-    return tuple(changed_files), updated_result
+    return tuple(changed_files.values()), updated_result
+
+
+def _record_changed_file(
+    changed_files: dict[str, ProposedFileChange],
+    *,
+    path: str,
+    additions: int,
+    deletions: int,
+) -> None:
+    previous = changed_files.get(path)
+    if previous is None:
+        changed_files[path] = ProposedFileChange(
+            path=path,
+            additions=additions,
+            deletions=deletions,
+            is_binary=False,
+        )
+        return
+    changed_files[path] = ProposedFileChange(
+        path=path,
+        additions=previous.additions + additions,
+        deletions=previous.deletions + deletions,
+        is_binary=False,
+    )
+
+
+def _apply_autonomous_patch(
+    path: Path,
+    before_content: str,
+    patch: AutonomousFilePatch,
+) -> tuple[str, str] | None:
+    match_count = before_content.count(patch.before)
+    if match_count == 1:
+        return before_content.replace(patch.before, patch.after, 1), "exact_replace"
+    if _disallow_fuzzy_patch(path):
+        return None
+    if match_count > 1:
+        return _try_fuzzy_patch(before_content, patch)
+    return _try_fuzzy_patch(before_content, patch)
+
+
+def _try_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> tuple[str, str] | None:
+    before_lines = patch.before.splitlines()
+    current_lines = before_content.splitlines()
+    if not before_lines or not current_lines:
+        return None
+
+    if len(before_lines) > len(current_lines):
+        candidate_windows = [(0, len(current_lines))]
+    else:
+        candidate_windows = [
+            (start, start + len(before_lines))
+            for start in range(0, len(current_lines) - len(before_lines) + 1)
+        ]
+
+    normalized_before = _normalize_patch_text(before_lines)
+    ranked_windows: list[tuple[float, int, int]] = []
+    for start, end in candidate_windows:
+        window_text = _normalize_patch_text(current_lines[start:end])
+        ratio = difflib.SequenceMatcher(None, normalized_before, window_text).ratio()
+        ranked_windows.append((ratio, start, end))
+
+    ranked_windows.sort(reverse=True)
+    if not ranked_windows:
+        return None
+    best_ratio, start, end = ranked_windows[0]
+    second_ratio = ranked_windows[1][0] if len(ranked_windows) > 1 else 0.0
+    if best_ratio < 0.72 or best_ratio - second_ratio < 0.08:
+        return None
+
+    replacement_lines = patch.after.splitlines()
+    updated_lines = current_lines[:start] + replacement_lines + current_lines[end:]
+    after_content = "\n".join(updated_lines)
+    if before_content.endswith("\n") or patch.after.endswith("\n"):
+        after_content += "\n"
+    return after_content, "fuzzy_replace"
+
+
+def _normalize_patch_text(lines: list[str]) -> str:
+    return "\n".join(line.strip() for line in lines).strip()
+
+
+def _disallow_fuzzy_patch(path: Path) -> bool:
+    structured_suffixes = {".toml", ".json", ".yaml", ".yml", ".ini", ".cfg"}
+    return path.suffix.lower() in structured_suffixes
 
 
 def _line_diff_stats(before: str, after: str) -> tuple[int, int]:

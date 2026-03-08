@@ -1209,6 +1209,9 @@ def _apply_autonomous_plan(
             },
         )
 
+    if plan.patches and not changed_files:
+        raise RuntimeConfigError("autonomous patches could not be materialized into workspace changes")
+
     return tuple(changed_files.values()), updated_result
 
 
@@ -1241,14 +1244,30 @@ def _apply_autonomous_patch(
     before_content: str,
     patch: AutonomousFilePatch,
 ) -> tuple[str, str] | None:
+    exact_patch = _try_exact_autonomous_patch(before_content, patch)
+    if exact_patch is not None:
+        return exact_patch
+    if _disallow_fuzzy_patch(path) or not _allow_fuzzy_patch(before_content, patch):
+        return None
+    return _try_fuzzy_patch(before_content, patch)
+
+
+def _try_exact_autonomous_patch(
+    before_content: str,
+    patch: AutonomousFilePatch,
+) -> tuple[str, str] | None:
     match_count = before_content.count(patch.before)
     if match_count == 1:
         return before_content.replace(patch.before, patch.after, 1), "exact_replace"
-    if _disallow_fuzzy_patch(path):
-        return None
-    if match_count > 1:
-        return _try_fuzzy_patch(before_content, patch)
-    return _try_fuzzy_patch(before_content, patch)
+    if _strip_single_trailing_newline(before_content) == _strip_single_trailing_newline(patch.before):
+        return patch.after, "exact_replace_normalized_eof"
+    return None
+
+
+def _allow_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> bool:
+    if _patch_rewrites_most_of_file(before_content, patch.before):
+        return False
+    return _count_unique_anchor_lines(before_content, patch.before) >= 2
 
 
 def _try_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> tuple[str, str] | None:
@@ -1290,6 +1309,42 @@ def _try_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> tuple[s
 
 def _normalize_patch_text(lines: list[str]) -> str:
     return "\n".join(line.strip() for line in lines).strip()
+
+
+def _strip_single_trailing_newline(text: str) -> str:
+    if text.endswith("\n"):
+        return text[:-1]
+    return text
+
+
+def _patch_rewrites_most_of_file(before_content: str, patch_before: str) -> bool:
+    normalized_file = before_content.strip()
+    normalized_patch = patch_before.strip()
+    if not normalized_file or not normalized_patch:
+        return False
+    return len(normalized_patch) / len(normalized_file) >= 0.6
+
+
+def _count_unique_anchor_lines(before_content: str, patch_before: str) -> int:
+    current_lines = [_normalize_anchor_line(line) for line in before_content.splitlines()]
+    patch_lines = [_normalize_anchor_line(line) for line in patch_before.splitlines()]
+    current_counts: dict[str, int] = {}
+    for line in current_lines:
+        if not line:
+            continue
+        current_counts[line] = current_counts.get(line, 0) + 1
+
+    unique_anchors: set[str] = set()
+    for line in patch_lines:
+        if not line:
+            continue
+        if current_counts.get(line) == 1:
+            unique_anchors.add(line)
+    return len(unique_anchors)
+
+
+def _normalize_anchor_line(line: str) -> str:
+    return line.strip()
 
 
 def _disallow_fuzzy_patch(path: Path) -> bool:

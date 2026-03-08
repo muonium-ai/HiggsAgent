@@ -571,6 +571,43 @@ def test_run_autonomous_ticket_rejects_ambiguous_structured_patch(
     assert any(call[0] == "comment" for call in mt_calls)
 
 
+def test_apply_autonomous_patch_normalizes_single_eof_newline_for_exact_replace() -> None:
+    patch = runtime.AutonomousFilePatch(
+        path="src/app.py",
+        before="def answer():\n    return 41\n",
+        after="def answer():\n    return 42\n",
+    )
+
+    result = runtime._apply_autonomous_patch(
+        Path("src/app.py"),
+        "def answer():\n    return 41",
+        patch,
+    )
+
+    assert result == ("def answer():\n    return 42\n", "exact_replace_normalized_eof")
+
+
+def test_apply_autonomous_patch_rejects_large_fuzzy_rewrite_without_exact_match() -> None:
+    before_content = (
+        '"""Module docstring."""\n\n'
+        "from dataclasses import dataclass\n\n"
+        "@dataclass\n"
+        "class Example:\n"
+        "    value: int\n\n"
+        "    def render(self) -> str:\n"
+        '        return f"value={self.value}"\n'
+    )
+    patch = runtime.AutonomousFilePatch(
+        path="src/example.py",
+        before=before_content + "\n",
+        after=before_content.replace("from dataclasses import dataclass", "import random\nfrom dataclasses import dataclass"),
+    )
+
+    result = runtime._apply_autonomous_patch(Path("src/example.py"), before_content, patch)
+
+    assert result is None
+
+
 def test_run_turnkey_project_reuses_single_ticket_runtime_and_persists_checkpoint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

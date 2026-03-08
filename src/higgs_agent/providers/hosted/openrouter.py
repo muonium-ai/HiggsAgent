@@ -42,6 +42,10 @@ class OpenRouterExecutorError(ValueError):
 
 OpenRouterExecutionResult = ProviderExecutionResult
 
+DEFAULT_OPENROUTER_APP_TITLE = "HiggsAgent"
+DEFAULT_OPENROUTER_APP_URL = "https://github.com/muonium-ai/HiggsAgent"
+DEFAULT_OPENROUTER_USER_AGENT = "HiggsAgent"
+
 
 @dataclass(slots=True)
 class OpenRouterHTTPTransport:
@@ -49,6 +53,9 @@ class OpenRouterHTTPTransport:
 
     api_key: str
     base_url: str = "https://openrouter.ai/api/v1"
+    app_title: str = DEFAULT_OPENROUTER_APP_TITLE
+    app_url: str = DEFAULT_OPENROUTER_APP_URL
+    user_agent: str = DEFAULT_OPENROUTER_USER_AGENT
 
     def complete(self, payload: dict[str, object], timeout_ms: int) -> dict[str, object]:
         request = Request(
@@ -57,6 +64,9 @@ class OpenRouterHTTPTransport:
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
+                "HTTP-Referer": self.app_url,
+                "X-OpenRouter-Title": self.app_title,
+                "User-Agent": self.user_agent,
             },
             method="POST",
         )

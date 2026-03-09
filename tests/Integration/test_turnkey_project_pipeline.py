@@ -8,7 +8,12 @@ import pytest
 from referencing import Registry, Resource
 
 import higgs_agent.runtime as runtime
-from higgs_agent.analytics import AnalyticsFilter, aggregate_attempt_summaries, build_ticket_metadata_index, load_attempt_summaries
+from higgs_agent.analytics import (
+    AnalyticsFilter,
+    aggregate_attempt_summaries,
+    build_ticket_metadata_index,
+    load_attempt_summaries,
+)
 from higgs_agent.testing import load_json_fixture, load_text_fixture
 
 
@@ -26,7 +31,9 @@ class SequenceTransport:
 def test_turnkey_project_pipeline_completes_fixture_project_and_remains_analytics_compatible(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repo_root = _prepare_turnkey_repo(tmp_path, ["tickets/turnkey_ready_alpha.md", "tickets/turnkey_ready_beta.md"])
+    repo_root = _prepare_turnkey_repo(
+        tmp_path, ["tickets/turnkey_ready_alpha.md", "tickets/turnkey_ready_beta.md"]
+    )
     assumptions = load_json_fixture("config/turnkey_project_benchmark_assumptions.json")
     responses = [
         load_json_fixture("provider/openrouter_turnkey_alpha_success.json"),
@@ -60,7 +67,9 @@ def test_turnkey_project_pipeline_completes_fixture_project_and_remains_analytic
         assert events_path.is_file()
         _validate_event_stream([json.loads(line) for line in events_path.read_text().splitlines()])
 
-    attempt_summaries_path = repo_root / ".higgs" / "local" / "analytics" / "attempt-summaries.ndjson"
+    attempt_summaries_path = (
+        repo_root / ".higgs" / "local" / "analytics" / "attempt-summaries.ndjson"
+    )
     summaries = load_attempt_summaries(attempt_summaries_path)
     assert len(summaries) == assumptions["expected_attempts"]
     for summary in summaries:
@@ -73,7 +82,9 @@ def test_turnkey_project_pipeline_completes_fixture_project_and_remains_analytic
     )
 
     assert len(analytics_report.records) == 1
-    assert analytics_report.records[0]["metrics"]["attempts_total"] == assumptions["expected_attempts"]
+    assert (
+        analytics_report.records[0]["metrics"]["attempts_total"] == assumptions["expected_attempts"]
+    )
     _validate_analytics_aggregate(analytics_report.records[0])
 
     review_bundle = json.loads(outcome.review_bundle_path.read_text())
@@ -83,7 +94,9 @@ def test_turnkey_project_pipeline_completes_fixture_project_and_remains_analytic
     assert review_bundle["untouched_tickets"] == []
 
 
-def test_turnkey_project_pipeline_reports_blocked_dependency_graph(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_turnkey_project_pipeline_reports_blocked_dependency_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _prepare_turnkey_repo(tmp_path, ["tickets/turnkey_blocked_graph.md"])
 
     monkeypatch.setattr(runtime, "OpenRouterHTTPTransport", _transport_factory([]))
@@ -107,7 +120,9 @@ def test_turnkey_project_pipeline_reports_blocked_dependency_graph(tmp_path: Pat
     assert review_bundle["blocked_tickets"][0]["reason"].startswith("missing_dependency")
 
 
-def test_turnkey_project_pipeline_stops_on_validation_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_turnkey_project_pipeline_stops_on_validation_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _prepare_turnkey_repo(tmp_path, ["tickets/turnkey_ready_alpha.md"])
     responses = [load_json_fixture("provider/openrouter_turnkey_alpha_success.json")]
 
@@ -134,8 +149,12 @@ def test_turnkey_project_pipeline_stops_on_validation_failure(tmp_path: Path, mo
     assert review_bundle["blocked_tickets"][0]["reason"] == "validation_failed"
 
 
-def test_turnkey_project_pipeline_resumes_after_ticket_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    repo_root = _prepare_turnkey_repo(tmp_path, ["tickets/turnkey_ready_alpha.md", "tickets/turnkey_ready_beta.md"])
+def test_turnkey_project_pipeline_resumes_after_ticket_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = _prepare_turnkey_repo(
+        tmp_path, ["tickets/turnkey_ready_alpha.md", "tickets/turnkey_ready_beta.md"]
+    )
     responses = [
         load_json_fixture("provider/openrouter_turnkey_alpha_success.json"),
         load_json_fixture("provider/openrouter_turnkey_beta_success.json"),
@@ -189,7 +208,9 @@ def _prepare_turnkey_repo(tmp_path: Path, ticket_fixtures: list[str]) -> Path:
     tickets_dir.mkdir()
     (repo_root / "requirements.md").write_text("Build the turnkey fixture app.\n")
     (tmp_path / "guardrails.json").write_text(Path("config/guardrails.example.json").read_text())
-    (tmp_path / "write-policy.json").write_text(Path("config/write-policy.example.json").read_text())
+    (tmp_path / "write-policy.json").write_text(
+        Path("config/write-policy.example.json").read_text()
+    )
     (tmp_path / "mt.py").write_text("print('ok')\n")
     for fixture in ticket_fixtures:
         frontmatter = load_text_fixture(fixture)
@@ -260,12 +281,16 @@ def _failing_validation_subprocess_runner():
 def _validate_event_stream(events: list[dict[str, object]]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
     for event in events:
@@ -275,12 +300,16 @@ def _validate_event_stream(events: list[dict[str, object]]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     jsonschema.Draft202012Validator(summary_schema, registry=registry).validate(summary)
 
@@ -288,11 +317,15 @@ def _validate_attempt_summary(summary: dict[str, object]) -> None:
 def _validate_analytics_aggregate(payload: dict[str, object]) -> None:
     aggregate_schema = json.loads(Path("schemas/analytics-aggregate.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     jsonschema.Draft202012Validator(aggregate_schema, registry=registry).validate(payload)

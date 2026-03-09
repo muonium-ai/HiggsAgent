@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import json
+from pathlib import Path
 
 import jsonschema
 from referencing import Registry, Resource
@@ -27,7 +26,9 @@ class FakeLocalTransport:
         self._responses = responses
         self.calls: list[tuple[str, str | None, int]] = []
 
-    def generate(self, prompt: str, system_prompt: str | None, timeout_ms: int) -> dict[str, object]:
+    def generate(
+        self, prompt: str, system_prompt: str | None, timeout_ms: int
+    ) -> dict[str, object]:
         self.calls.append((prompt, system_prompt, timeout_ms))
         response = self._responses.pop(0)
         if isinstance(response, Exception):
@@ -82,7 +83,9 @@ def test_dispatcher_pipeline_includes_requirements_text_in_provider_prompt(tmp_p
     assert "Project requirements:" in user_message
     assert "Keep the implementation reproducible." in user_message
     assert "Dispatcher docs fixture" in user_message
-    assert "Exercise the deterministic dispatcher integration path for a docs ticket." in user_message
+    assert (
+        "Exercise the deterministic dispatcher integration path for a docs ticket." in user_message
+    )
 
 
 def test_dispatcher_pipeline_requires_handoff_for_protected_paths(tmp_path: Path) -> None:
@@ -94,9 +97,7 @@ def test_dispatcher_pipeline_requires_handoff_for_protected_paths(tmp_path: Path
         transport=transport,
         guardrails_path=Path("config/guardrails.example.json"),
         write_policy_path=Path("config/write-policy.example.json"),
-        planned_changes=(
-            ProposedFileChange(path="pyproject.toml", additions=1, deletions=1),
-        ),
+        planned_changes=(ProposedFileChange(path="pyproject.toml", additions=1, deletions=1),),
         validation_summary="dispatcher pipeline succeeded but touched protected path",
     )
 
@@ -128,7 +129,9 @@ def test_dispatcher_pipeline_blocks_local_execution_before_transport(tmp_path: P
     assert transport.calls == []
 
 
-def test_dispatcher_pipeline_executes_explicit_local_route_when_transport_is_available(tmp_path: Path) -> None:
+def test_dispatcher_pipeline_executes_explicit_local_route_when_transport_is_available(
+    tmp_path: Path,
+) -> None:
     tickets_dir = _write_ticket_fixture(tmp_path, "tickets/dispatcher_ready_local.md")
     transport = FakeTransport([])
     local_transport = FakeLocalTransport(
@@ -231,12 +234,16 @@ def _write_ticket_fixture(tmp_path: Path, relative_fixture_path: str) -> Path:
 def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
     for event in events:
@@ -246,12 +253,16 @@ def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(summary_schema, registry=registry)
     validator.validate(summary)

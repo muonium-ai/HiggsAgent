@@ -31,7 +31,9 @@ class FakeLocalTransport:
         self.response = response
         self.calls: list[tuple[str, str | None, int]] = []
 
-    def generate(self, prompt: str, system_prompt: str | None, timeout_ms: int) -> dict[str, object]:
+    def generate(
+        self, prompt: str, system_prompt: str | None, timeout_ms: int
+    ) -> dict[str, object]:
         self.calls.append((prompt, system_prompt, timeout_ms))
         return self.response
 
@@ -40,7 +42,9 @@ class RaisingLocalTransport:
     def __init__(self, error: Exception) -> None:
         self.error = error
 
-    def generate(self, prompt: str, system_prompt: str | None, timeout_ms: int) -> dict[str, object]:
+    def generate(
+        self, prompt: str, system_prompt: str | None, timeout_ms: int
+    ) -> dict[str, object]:
         del prompt, system_prompt, timeout_ms
         raise self.error
 
@@ -175,12 +179,16 @@ def _executor_input(*, execution_target: str) -> ExecutorInput:
 def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
     for event in events:
@@ -190,12 +198,16 @@ def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(summary_schema, registry=registry)
     validator.validate(summary)

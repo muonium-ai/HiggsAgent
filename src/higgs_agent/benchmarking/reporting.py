@@ -268,8 +268,16 @@ def _ranking_key(candidate: BenchmarkCandidateReport) -> tuple[object, ...]:
 
 def _tie_key(candidate: BenchmarkCandidateReport) -> tuple[object, ...]:
     quality_signal_avg = candidate.ranking_inputs.get("quality_signal_avg")
-    latency_ms = candidate.raw_metrics.latency_ms if candidate.raw_metrics.latency_ms is not None else 999999999
-    cost_usd = candidate.raw_metrics.cost_usd if candidate.raw_metrics.cost_usd is not None else 999999999.0
+    latency_ms = (
+        candidate.raw_metrics.latency_ms
+        if candidate.raw_metrics.latency_ms is not None
+        else 999999999
+    )
+    cost_usd = (
+        candidate.raw_metrics.cost_usd
+        if candidate.raw_metrics.cost_usd is not None
+        else 999999999.0
+    )
     return (
         -int(candidate.ranking_inputs["final_result_rank"]),
         -(float(quality_signal_avg) if quality_signal_avg is not None else -1.0),

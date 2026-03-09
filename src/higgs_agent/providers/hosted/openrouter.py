@@ -158,8 +158,7 @@ class OpenRouterExecutor:
                 "execution.completed",
                 "blocked",
                 payload={
-                    "blocked_reason": execution_input.route.blocked_reason
-                    or "route_not_selected"
+                    "blocked_reason": execution_input.route.blocked_reason or "route_not_selected"
                 },
                 limits=self.limits,
             )

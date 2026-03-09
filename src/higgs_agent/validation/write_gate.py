@@ -151,9 +151,7 @@ def evaluate_write_request(
             requires_human_review=False,
         )
 
-    protected_hits = [
-        path for path in changed_paths if _matches_any(path, policy.protected_paths)
-    ]
+    protected_hits = [path for path in changed_paths if _matches_any(path, policy.protected_paths)]
     disallowed_hits = [
         path for path in changed_paths if not _matches_any(path, policy.allowed_paths)
     ]

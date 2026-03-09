@@ -123,13 +123,19 @@ def _attempt_group_entry(
     failed_count = sum(1 for summary in summaries if summary.get("final_result") == "failed")
     blocked_count = sum(1 for summary in summaries if summary.get("final_result") == "blocked")
     retry_count_total = sum(_int_or_zero(summary.get("retry_count")) for summary in summaries)
-    tool_call_count_total = sum(_int_or_zero(summary.get("tool_call_count")) for summary in summaries)
+    tool_call_count_total = sum(
+        _int_or_zero(summary.get("tool_call_count")) for summary in summaries
+    )
 
     duration_values = [_summary_duration_ms(summary) for summary in summaries]
     total_token_values = [_summary_total_tokens(summary) for summary in summaries]
     cost_values = [_summary_cost_usd(summary) for summary in summaries]
     last_observed = max(
-        (_summary_last_observed(summary) for summary in summaries if _summary_last_observed(summary)),
+        (
+            _summary_last_observed(summary)
+            for summary in summaries
+            if _summary_last_observed(summary)
+        ),
         default=None,
     )
 
@@ -196,7 +202,6 @@ def _aggregate_group_entry(
     duration_denominator = 0
     total_tokens_total = 0.0
     tokens_denominator = 0
-    cost_usd_total = 0.0
     last_observed: datetime | None = None
 
     for record in records:
@@ -339,7 +344,10 @@ def _aggregate_average_cost(
         telemetry_gaps.append("cost_usd_unavailable")
         return None
 
-    total_cost = sum(_float_or_zero(_as_mapping(record.get("metrics")).get("cost_usd_total")) for record in records)
+    total_cost = sum(
+        _float_or_zero(_as_mapping(record.get("metrics")).get("cost_usd_total"))
+        for record in records
+    )
     if provider == "local":
         telemetry_gaps.append("cost_precision_unknown_from_aggregate")
         return None

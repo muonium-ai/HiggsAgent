@@ -24,11 +24,13 @@ class FakeExecutor:
     def __init__(self, result_factory) -> None:
         self._result_factory = result_factory
 
-    def execute(self, execution_input: ExecutorInput, *, tool_invoker=None) -> ProviderExecutionResult:
+    def execute(
+        self, execution_input: ExecutorInput, *, tool_invoker=None
+    ) -> ProviderExecutionResult:
         return self._result_factory(execution_input)
 
 
-def test_benchmark_pipeline_outputs_remain_compatible_with_observability_and_analytics_contracts() -> None:
+def test_benchmark_pipeline_outputs_compatible_with_observability_contracts() -> None:
     workload = load_benchmark_workload_manifest().workloads[1]
     harness_result = run_benchmark_workload(
         workload,
@@ -36,12 +38,20 @@ def test_benchmark_pipeline_outputs_remain_compatible_with_observability_and_ana
             BenchmarkCandidate(
                 "balanced",
                 _route(workload, "openrouter", "openai/gpt-4o", "balanced"),
-                FakeExecutor(lambda execution_input: _succeeded_result(execution_input, latency_ms=300, cost_usd=0.04)),
+                FakeExecutor(
+                    lambda execution_input: _succeeded_result(
+                        execution_input, latency_ms=300, cost_usd=0.04
+                    )
+                ),
             ),
             BenchmarkCandidate(
                 "deep",
                 _route(workload, "openrouter", "anthropic/claude-3.5-sonnet", "deep"),
-                FakeExecutor(lambda execution_input: _succeeded_result(execution_input, latency_ms=220, cost_usd=0.06)),
+                FakeExecutor(
+                    lambda execution_input: _succeeded_result(
+                        execution_input, latency_ms=220, cost_usd=0.06
+                    )
+                ),
             ),
         ),
         config=BenchmarkHarnessConfig(benchmark_id="bench-contract-1", repo_head="abc123"),
@@ -50,7 +60,9 @@ def test_benchmark_pipeline_outputs_remain_compatible_with_observability_and_ana
     report = build_benchmark_report(
         harness_result,
         quality_signals_by_candidate={
-            "balanced": (BenchmarkQualitySignal("rubric_accuracy", 0.82, "Solid tradeoff summary"),),
+            "balanced": (
+                BenchmarkQualitySignal("rubric_accuracy", 0.82, "Solid tradeoff summary"),
+            ),
             "deep": (BenchmarkQualitySignal("rubric_accuracy", 0.91, "More complete reasoning"),),
         },
     )
@@ -60,7 +72,10 @@ def test_benchmark_pipeline_outputs_remain_compatible_with_observability_and_ana
         _validate_attempt_summary(candidate_result.execution_result.attempt_summary)
 
     analytics_report = aggregate_attempt_summaries(
-        tuple(candidate_result.execution_result.attempt_summary for candidate_result in harness_result.candidate_results),
+        tuple(
+            candidate_result.execution_result.attempt_summary
+            for candidate_result in harness_result.candidate_results
+        ),
         {
             f"BENCH-{workload.workload_id}": {
                 "ticket_type": workload.ticket_shape.work_type,
@@ -83,7 +98,9 @@ def test_benchmark_pipeline_outputs_remain_compatible_with_observability_and_ana
     assert "raw_prompt" not in json.dumps(payload)
 
 
-def test_benchmark_pipeline_is_reproducible_for_fixed_inputs_and_surfaces_partial_failures() -> None:
+def test_benchmark_pipeline_is_reproducible_for_fixed_inputs_and_surfaces_partial_failures() -> (
+    None
+):
     workload = load_benchmark_workload_manifest().workloads[0]
 
     def build_report() -> dict[str, object]:
@@ -93,7 +110,11 @@ def test_benchmark_pipeline_is_reproducible_for_fixed_inputs_and_surfaces_partia
                 BenchmarkCandidate(
                     "docs-success",
                     _route(workload, "openrouter", "openai/gpt-4o-mini", "economy"),
-                    FakeExecutor(lambda execution_input: _succeeded_result(execution_input, latency_ms=180, cost_usd=0.02)),
+                    FakeExecutor(
+                        lambda execution_input: _succeeded_result(
+                            execution_input, latency_ms=180, cost_usd=0.02
+                        )
+                    ),
                 ),
                 BenchmarkCandidate(
                     "docs-failure",
@@ -243,12 +264,16 @@ def _failed_result_without_precise_cost(execution_input: ExecutorInput) -> Provi
 def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
     for event in events:
@@ -258,12 +283,16 @@ def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     jsonschema.Draft202012Validator(summary_schema, registry=registry).validate(summary)
 

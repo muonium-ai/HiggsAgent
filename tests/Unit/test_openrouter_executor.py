@@ -43,17 +43,19 @@ class FakeToolInvoker:
 def test_executor_produces_schema_valid_events_and_summary() -> None:
     executor = OpenRouterExecutor(
         limits=load_executor_limits(Path("config/guardrails.example.json")),
-        transport=FakeTransport([
-            {
-                "choices": [{"message": {"content": "Done"}}],
-                "usage": {
-                    "prompt_tokens": 120,
-                    "completion_tokens": 30,
-                    "total_tokens": 150,
-                    "cost": 0.42,
-                },
-            }
-        ]),
+        transport=FakeTransport(
+            [
+                {
+                    "choices": [{"message": {"content": "Done"}}],
+                    "usage": {
+                        "prompt_tokens": 120,
+                        "completion_tokens": 30,
+                        "total_tokens": 150,
+                        "cost": 0.42,
+                    },
+                }
+            ]
+        ),
     )
     execution_input = _executor_input(ticket_type="docs")
 
@@ -68,27 +70,29 @@ def test_executor_produces_schema_valid_events_and_summary() -> None:
 def test_executor_invokes_tools_and_emits_tool_events() -> None:
     executor = OpenRouterExecutor(
         limits=load_executor_limits(Path("config/guardrails.example.json")),
-        transport=FakeTransport([
-            {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "call-1",
-                                    "function": {
-                                        "name": "read_ticket",
-                                        "arguments": "{\"ticket_id\": \"T-1\"}",
-                                    },
-                                }
-                            ],
+        transport=FakeTransport(
+            [
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "",
+                                "tool_calls": [
+                                    {
+                                        "id": "call-1",
+                                        "function": {
+                                            "name": "read_ticket",
+                                            "arguments": '{"ticket_id": "T-1"}',
+                                        },
+                                    }
+                                ],
+                            }
                         }
-                    }
-                ],
-                "usage": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
-            }
-        ]),
+                    ],
+                    "usage": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
+                }
+            ]
+        ),
     )
     tool_invoker = FakeToolInvoker()
     execution_input = _executor_input(
@@ -168,22 +172,24 @@ def test_executor_blocks_when_route_not_selected() -> None:
 def test_executor_fails_when_tool_calls_exceed_budget() -> None:
     executor = OpenRouterExecutor(
         limits=load_executor_limits(Path("tests/Fixtures/config/guardrails_tool_budget_one.json")),
-        transport=FakeTransport([
-            {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {"id": "call-1", "function": {"name": "a", "arguments": "{}"}},
-                                {"id": "call-2", "function": {"name": "b", "arguments": "{}"}},
-                            ],
+        transport=FakeTransport(
+            [
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "",
+                                "tool_calls": [
+                                    {"id": "call-1", "function": {"name": "a", "arguments": "{}"}},
+                                    {"id": "call-2", "function": {"name": "b", "arguments": "{}"}},
+                                ],
+                            }
                         }
-                    }
-                ],
-                "usage": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
-            }
-        ]),
+                    ],
+                    "usage": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
+                }
+            ]
+        ),
     )
 
     result = executor.execute(_executor_input(ticket_type="code"), tool_invoker=FakeToolInvoker())
@@ -195,21 +201,23 @@ def test_executor_fails_when_tool_calls_exceed_budget() -> None:
 def test_executor_requires_tool_invoker_when_tools_are_returned() -> None:
     executor = OpenRouterExecutor(
         limits=load_executor_limits(Path("config/guardrails.example.json")),
-        transport=FakeTransport([
-            {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {"id": "call-1", "function": {"name": "a", "arguments": "{}"}}
-                            ],
+        transport=FakeTransport(
+            [
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "",
+                                "tool_calls": [
+                                    {"id": "call-1", "function": {"name": "a", "arguments": "{}"}}
+                                ],
+                            }
                         }
-                    }
-                ],
-                "usage": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
-            }
-        ]),
+                    ],
+                    "usage": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
+                }
+            ]
+        ),
     )
 
     result = executor.execute(
@@ -304,12 +312,16 @@ def _executor_input(
 def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
     for event in events:
@@ -319,12 +331,16 @@ def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(summary_schema, registry=registry)
     validator.validate(summary)

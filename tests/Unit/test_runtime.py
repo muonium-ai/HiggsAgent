@@ -6,12 +6,14 @@ from pathlib import Path
 from higgs_agent.application import DispatchOutcome
 from higgs_agent.providers.contract import ProviderExecutionResult
 from higgs_agent.routing import NormalizedTicketSemantics, RouteDecision
-from higgs_agent.tickets import TicketRecord
 from higgs_agent.runtime import persist_dispatch_outcome
+from higgs_agent.tickets import TicketRecord
 from higgs_agent.validation import ValidationDecision
 
 
-def test_persist_dispatch_outcome_writes_events_attempt_summary_and_artifacts(tmp_path: Path) -> None:
+def test_persist_dispatch_outcome_writes_events_attempt_summary_and_artifacts(
+    tmp_path: Path,
+) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     outcome = DispatchOutcome(

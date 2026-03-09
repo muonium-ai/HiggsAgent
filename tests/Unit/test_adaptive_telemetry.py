@@ -80,7 +80,9 @@ def test_attempt_summary_snapshot_flags_stale_and_missing_telemetry() -> None:
     assert "stale_telemetry" in entry.telemetry_gaps
 
 
-def test_aggregate_snapshot_merges_provider_model_records_and_marks_local_cost_precision_gap() -> None:
+def test_aggregate_snapshot_merges_provider_model_records_and_marks_local_cost_precision_gap() -> (
+    None
+):
     snapshot = build_adaptive_snapshot_from_aggregate_records(
         (
             {

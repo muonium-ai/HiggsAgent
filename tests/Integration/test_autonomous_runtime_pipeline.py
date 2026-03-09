@@ -22,7 +22,9 @@ class FakeTransport:
         return response
 
 
-def test_autonomous_runtime_persists_schema_valid_successful_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_autonomous_runtime_persists_schema_valid_successful_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _prepare_repo(tmp_path)
     mt_calls: list[list[str]] = []
 
@@ -38,7 +40,9 @@ def test_autonomous_runtime_persists_schema_valid_successful_run(tmp_path: Path,
         validation_commands=("uv run pytest tests",),
         openrouter_api_key="test-key",
         muontickets_cli_path=tmp_path / "mt.py",
-        transport=FakeTransport([load_json_fixture("provider/openrouter_autonomous_scaffold_success.json")]),
+        transport=FakeTransport(
+            [load_json_fixture("provider/openrouter_autonomous_scaffold_success.json")]
+        ),
     )
 
     assert outcome.execution_result.status == "succeeded"
@@ -61,7 +65,9 @@ def test_autonomous_runtime_persists_schema_valid_successful_run(tmp_path: Path,
     _validate_attempt_summary(summaries[0])
 
 
-def test_autonomous_runtime_records_provider_failure_without_advancing_ticket(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_autonomous_runtime_records_provider_failure_without_advancing_ticket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _prepare_repo(tmp_path)
     mt_calls: list[list[str]] = []
 
@@ -86,7 +92,9 @@ def test_autonomous_runtime_records_provider_failure_without_advancing_ticket(tm
     assert any(call[0] == "comment" for call in mt_calls)
 
 
-def test_autonomous_runtime_rejects_failed_validation_without_advancing_ticket(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_autonomous_runtime_rejects_failed_validation_without_advancing_ticket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _prepare_repo(tmp_path)
     mt_calls: list[list[str]] = []
 
@@ -102,7 +110,9 @@ def test_autonomous_runtime_rejects_failed_validation_without_advancing_ticket(t
         validation_commands=("uv run pytest tests",),
         openrouter_api_key="test-key",
         muontickets_cli_path=tmp_path / "mt.py",
-        transport=FakeTransport([load_json_fixture("provider/openrouter_autonomous_scaffold_success.json")]),
+        transport=FakeTransport(
+            [load_json_fixture("provider/openrouter_autonomous_scaffold_success.json")]
+        ),
     )
 
     assert outcome.validation_decision.decision == "rejected"
@@ -110,7 +120,9 @@ def test_autonomous_runtime_rejects_failed_validation_without_advancing_ticket(t
     assert not any(call[:3] == ["set-status", "T-920001", "needs_review"] for call in mt_calls)
 
 
-def test_autonomous_runtime_writes_review_handoff_for_protected_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_autonomous_runtime_writes_review_handoff_for_protected_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _prepare_repo(tmp_path)
     mt_calls: list[list[str]] = []
 
@@ -126,7 +138,9 @@ def test_autonomous_runtime_writes_review_handoff_for_protected_path(tmp_path: P
         validation_commands=("uv run pytest tests",),
         openrouter_api_key="test-key",
         muontickets_cli_path=tmp_path / "mt.py",
-        transport=FakeTransport([load_json_fixture("provider/openrouter_autonomous_protected_write.json")]),
+        transport=FakeTransport(
+            [load_json_fixture("provider/openrouter_autonomous_protected_write.json")]
+        ),
     )
 
     assert outcome.validation_decision.decision == "handoff_required"
@@ -151,7 +165,9 @@ def test_autonomous_runtime_materializes_fixture_scaffold_then_applies_follow_up
     mt_calls: list[list[str]] = []
     _add_allowed_write_path(tmp_path / "write-policy.json", "fixtures/**")
 
-    monkeypatch.setattr(runtime, "_run_muontickets_command", _mutating_muontickets(repo_root, mt_calls))
+    monkeypatch.setattr(
+        runtime, "_run_muontickets_command", _mutating_muontickets(repo_root, mt_calls)
+    )
     monkeypatch.setattr(runtime.subprocess, "run", _success_subprocess_runner())
 
     scaffold_outcome = runtime.run_autonomous_ticket(
@@ -163,7 +179,9 @@ def test_autonomous_runtime_materializes_fixture_scaffold_then_applies_follow_up
         validation_commands=("uv run pytest tests",),
         openrouter_api_key="test-key",
         muontickets_cli_path=tmp_path / "mt.py",
-        transport=FakeTransport([load_json_fixture("provider/openrouter_autonomous_game_of_life_scaffold.json")]),
+        transport=FakeTransport(
+            [load_json_fixture("provider/openrouter_autonomous_game_of_life_scaffold.json")]
+        ),
     )
 
     assert scaffold_outcome.execution_result.status == "succeeded"
@@ -176,7 +194,9 @@ def test_autonomous_runtime_materializes_fixture_scaffold_then_applies_follow_up
     )
     assert (repo_root / "src" / "game_of_life" / "engine.py").is_file()
     assert (repo_root / "fixtures" / "blinker.txt").read_text() == ".#.\n.#.\n.#.\n"
-    scaffold_artifacts_dir = repo_root / scaffold_outcome.execution_result.metadata["telemetry_paths"]["artifacts_dir"]
+    scaffold_artifacts_dir = (
+        repo_root / scaffold_outcome.execution_result.metadata["telemetry_paths"]["artifacts_dir"]
+    )
     scaffold_plan = json.loads((scaffold_artifacts_dir / "materialization-plan.json").read_text())
     assert scaffold_plan["writes"] == [
         "src/game_of_life/__init__.py",
@@ -184,7 +204,14 @@ def test_autonomous_runtime_materializes_fixture_scaffold_then_applies_follow_up
         "tests/test_engine.py",
         "fixtures/blinker.txt",
     ]
-    scaffold_events = [json.loads(line) for line in (repo_root / scaffold_outcome.execution_result.metadata["telemetry_paths"]["events"]).read_text().splitlines()]
+    scaffold_events = [
+        json.loads(line)
+        for line in (
+            repo_root / scaffold_outcome.execution_result.metadata["telemetry_paths"]["events"]
+        )
+        .read_text()
+        .splitlines()
+    ]
     assert "directory.created" in [event["event_type"] for event in scaffold_events]
     assert "file.written" in [event["event_type"] for event in scaffold_events]
     _validate_event_stream(scaffold_events)
@@ -198,7 +225,9 @@ def test_autonomous_runtime_materializes_fixture_scaffold_then_applies_follow_up
         validation_commands=("uv run pytest tests",),
         openrouter_api_key="test-key",
         muontickets_cli_path=tmp_path / "mt.py",
-        transport=FakeTransport([load_json_fixture("provider/openrouter_autonomous_game_of_life_patch.json")]),
+        transport=FakeTransport(
+            [load_json_fixture("provider/openrouter_autonomous_game_of_life_patch.json")]
+        ),
     )
 
     assert patch_outcome.ticket.id == "T-920002"
@@ -208,27 +237,55 @@ def test_autonomous_runtime_materializes_fixture_scaffold_then_applies_follow_up
         "src/game_of_life/engine.py",
         "tests/test_engine.py",
     )
-    assert "return [\"...\", \"###\", \"...\"]" in (repo_root / "src" / "game_of_life" / "engine.py").read_text()
+    assert (
+        'return ["...", "###", "..."]'
+        in (repo_root / "src" / "game_of_life" / "engine.py").read_text()
+    )
     assert "test_next_state_rotates_blinker" in (repo_root / "tests" / "test_engine.py").read_text()
-    patch_artifacts_dir = repo_root / patch_outcome.execution_result.metadata["telemetry_paths"]["artifacts_dir"]
+    patch_artifacts_dir = (
+        repo_root / patch_outcome.execution_result.metadata["telemetry_paths"]["artifacts_dir"]
+    )
     patch_plan = json.loads((patch_artifacts_dir / "materialization-plan.json").read_text())
     assert patch_plan["patches"] == [
         {
             "path": "src/game_of_life/engine.py",
             "before": "    return board\n",
-            "after": "    if board == [\".#.\", \".#.\", \".#.\"]:\n        return [\"...\", \"###\", \"...\"]\n    return board\n",
+            "after": (
+                '    if board == [".#.", ".#.", ".#."]:\n'
+                '        return ["...", "###", "..."]\n'
+                "    return board\n"
+            ),
         },
         {
             "path": "tests/test_engine.py",
-            "before": "def test_next_state_preserves_board():\n    assert next_state([\".#.\"]) == [\".#.\"]\n",
-            "after": "def test_next_state_preserves_board():\n    assert next_state([\".#.\"]) == [\".#.\"]\n\n\ndef test_next_state_rotates_blinker():\n    assert next_state([\".#.\", \".#.\", \".#.\"]) == [\"...\", \"###\", \"...\"]\n",
+            "before": (
+                "def test_next_state_preserves_board():\n"
+                '    assert next_state([".#."]) == [".#."]\n'
+            ),
+            "after": (
+                "def test_next_state_preserves_board():\n"
+                '    assert next_state([".#."]) == [".#."]\n'
+                "\n\n"
+                "def test_next_state_rotates_blinker():\n"
+                "    assert next_state("
+                '[".#.", ".#.", ".#."]) == ["...", "###", "..."]\n'
+            ),
         },
     ]
-    patch_events = [json.loads(line) for line in (repo_root / patch_outcome.execution_result.metadata["telemetry_paths"]["events"]).read_text().splitlines()]
+    patch_events = [
+        json.loads(line)
+        for line in (
+            repo_root / patch_outcome.execution_result.metadata["telemetry_paths"]["events"]
+        )
+        .read_text()
+        .splitlines()
+    ]
     assert "file.patched" in [event["event_type"] for event in patch_events]
     _validate_event_stream(patch_events)
 
-    attempt_summaries_path = repo_root / ".higgs" / "local" / "analytics" / "attempt-summaries.ndjson"
+    attempt_summaries_path = (
+        repo_root / ".higgs" / "local" / "analytics" / "attempt-summaries.ndjson"
+    )
     summaries = [json.loads(line) for line in attempt_summaries_path.read_text().splitlines()]
     assert len(summaries) == 2
     assert [summary["ticket_id"] for summary in summaries] == ["T-920001", "T-920002"]
@@ -253,7 +310,9 @@ def test_autonomous_runtime_rejects_fixture_patch_without_corrupting_workspace(
     )
     (repo_root / "src" / "game_of_life" / "engine.py").write_text(original_content)
 
-    monkeypatch.setattr(runtime, "_run_muontickets_command", _mutating_muontickets(repo_root, mt_calls))
+    monkeypatch.setattr(
+        runtime, "_run_muontickets_command", _mutating_muontickets(repo_root, mt_calls)
+    )
     monkeypatch.setattr(runtime.subprocess, "run", _success_subprocess_runner())
 
     outcome = runtime.run_autonomous_ticket(
@@ -265,7 +324,9 @@ def test_autonomous_runtime_rejects_fixture_patch_without_corrupting_workspace(
         validation_commands=("uv run pytest tests",),
         openrouter_api_key="test-key",
         muontickets_cli_path=tmp_path / "mt.py",
-        transport=FakeTransport([load_json_fixture("provider/openrouter_autonomous_patch_ambiguous.json")]),
+        transport=FakeTransport(
+            [load_json_fixture("provider/openrouter_autonomous_patch_ambiguous.json")]
+        ),
     )
 
     assert outcome.execution_result.status == "failed"
@@ -278,7 +339,12 @@ def test_autonomous_runtime_rejects_fixture_patch_without_corrupting_workspace(
     events_path = repo_root / outcome.execution_result.metadata["telemetry_paths"]["events"]
     events = [json.loads(line) for line in events_path.read_text().splitlines()]
     _validate_event_stream(events)
-    summaries = [json.loads(line) for line in (repo_root / ".higgs" / "local" / "analytics" / "attempt-summaries.ndjson").read_text().splitlines()]
+    summaries = [
+        json.loads(line)
+        for line in (repo_root / ".higgs" / "local" / "analytics" / "attempt-summaries.ndjson")
+        .read_text()
+        .splitlines()
+    ]
     assert len(summaries) == 1
     assert summaries[0]["final_result"] == "failed"
     _validate_attempt_summary(summaries[0])
@@ -291,7 +357,9 @@ def _prepare_repo(tmp_path: Path, ticket_fixtures: list[str] | None = None) -> P
     tickets_dir.mkdir()
     (repo_root / "requirements.md").write_text("Build the sample app.\n")
     (tmp_path / "guardrails.json").write_text(Path("config/guardrails.example.json").read_text())
-    (tmp_path / "write-policy.json").write_text(Path("config/write-policy.example.json").read_text())
+    (tmp_path / "write-policy.json").write_text(
+        Path("config/write-policy.example.json").read_text()
+    )
     (tmp_path / "mt.py").write_text("print('ok')\n")
     selected_fixtures = ticket_fixtures or ["tickets/autonomous_ready_code.md"]
     for fixture in selected_fixtures:
@@ -370,12 +438,16 @@ def _failing_validation_subprocess_runner():
 def _validate_event_stream(events: list[dict[str, object]]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
     for event in events:
@@ -385,12 +457,16 @@ def _validate_event_stream(events: list[dict[str, object]]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(summary_schema, registry=registry)
     validator.validate(summary)

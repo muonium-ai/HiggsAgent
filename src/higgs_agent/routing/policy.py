@@ -298,14 +298,22 @@ def _load_route_profile(
 
     provider = profile_payload.get("provider", default_profile.provider)
     model_id = profile_payload.get("model_id", default_profile.model_id)
-    estimated_cost_usd = profile_payload.get("estimated_cost_usd", default_profile.estimated_cost_usd)
+    estimated_cost_usd = profile_payload.get(
+        "estimated_cost_usd", default_profile.estimated_cost_usd
+    )
 
     if not isinstance(provider, str) or not provider.strip():
-        raise RoutingInputError(f"guardrail config routing.{profile_name}.provider must be a non-empty string")
+        raise RoutingInputError(
+            f"guardrail config routing.{profile_name}.provider must be a non-empty string"
+        )
     if not isinstance(model_id, str) or not model_id.strip():
-        raise RoutingInputError(f"guardrail config routing.{profile_name}.model_id must be a non-empty string")
+        raise RoutingInputError(
+            f"guardrail config routing.{profile_name}.model_id must be a non-empty string"
+        )
     if not isinstance(estimated_cost_usd, int | float):
-        raise RoutingInputError(f"guardrail config routing.{profile_name}.estimated_cost_usd must be numeric")
+        raise RoutingInputError(
+            f"guardrail config routing.{profile_name}.estimated_cost_usd must be numeric"
+        )
 
     return RouteProfile(
         provider=provider,

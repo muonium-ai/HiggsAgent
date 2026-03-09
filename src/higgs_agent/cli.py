@@ -18,13 +18,17 @@ from higgs_agent.analytics import (
     load_attempt_summaries,
     render_report_table,
 )
-from higgs_agent.bootstrap import BootstrapError, available_sample_projects, bootstrap_sample_project
+from higgs_agent.bootstrap import (
+    BootstrapError,
+    available_sample_projects,
+    bootstrap_sample_project,
+)
 from higgs_agent.runtime import (
     RuntimeConfigError,
     parse_changed_file_spec,
     run_autonomous_ticket,
-    run_turnkey_project,
     run_ticketed_project,
+    run_turnkey_project,
 )
 
 
@@ -203,7 +207,9 @@ def _run_analytics_report(args: argparse.Namespace) -> None:
     except FileNotFoundError as exc:
         raise SystemExit(f"analytics report failed: {exc}") from exc
     except JSONDecodeError as exc:
-        raise SystemExit(f"analytics report failed: invalid JSON in attempt summaries: {exc}") from exc
+        raise SystemExit(
+            f"analytics report failed: invalid JSON in attempt summaries: {exc}"
+        ) from exc
     except ValueError as exc:
         raise SystemExit(f"analytics report failed: {exc}") from exc
 
@@ -279,7 +285,9 @@ def _run_autonomous_ticket(args: argparse.Namespace) -> None:
         write_policy_path = _require_file_path(args.write_policy, flag_name="--write-policy")
         muontickets_cli_path = None
         if args.muontickets_cli is not None:
-            muontickets_cli_path = _require_file_path(args.muontickets_cli, flag_name="--muontickets-cli")
+            muontickets_cli_path = _require_file_path(
+                args.muontickets_cli, flag_name="--muontickets-cli"
+            )
         openrouter_api_key = args.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY")
         if not openrouter_api_key:
             raise RuntimeConfigError(
@@ -325,7 +333,9 @@ def _run_turnkey_project(args: argparse.Namespace) -> None:
         write_policy_path = _require_file_path(args.write_policy, flag_name="--write-policy")
         muontickets_cli_path = None
         if args.muontickets_cli is not None:
-            muontickets_cli_path = _require_file_path(args.muontickets_cli, flag_name="--muontickets-cli")
+            muontickets_cli_path = _require_file_path(
+                args.muontickets_cli, flag_name="--muontickets-cli"
+            )
         openrouter_api_key = args.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY")
         if not openrouter_api_key:
             raise RuntimeConfigError(
@@ -356,7 +366,8 @@ def _run_turnkey_project(args: argparse.Namespace) -> None:
     print(f"resumed: {str(outcome.resumed).lower()}")
     print(f"retry_count: {outcome.retry_count}")
     print(f"commit_policy: {outcome.commit_policy}")
-    print(f"attempted_tickets: {', '.join(ticket.ticket_id for ticket in outcome.attempted_tickets) or 'none'}")
+    attempted = ", ".join(ticket.ticket_id for ticket in outcome.attempted_tickets) or "none"
+    print(f"attempted_tickets: {attempted}")
     print(f"completed_tickets: {', '.join(outcome.completed_tickets) or 'none'}")
     print(f"checkpoint_path: {outcome.checkpoint_path.relative_to(repo_root)}")
     print(f"summary_path: {outcome.summary_path.relative_to(repo_root)}")
@@ -382,7 +393,9 @@ def _run_validate_tickets(args: argparse.Namespace) -> None:
         stderr = result.stderr.strip()
         if stderr:
             raise SystemExit(f"validate tickets failed: {stderr}")
-        raise SystemExit("validate tickets failed: MuonTickets validation exited with a non-zero status")
+        raise SystemExit(
+            "validate tickets failed: MuonTickets validation exited with a non-zero status"
+        )
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
 

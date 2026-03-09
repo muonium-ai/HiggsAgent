@@ -40,7 +40,9 @@ def bootstrap_sample_project(
 
     _ensure_target_dir(target_dir, force=force)
     _initialize_git_repo(target_dir)
-    _copy_sample_project_tree(sample_source_dir, target_dir / "sample-projects" / sample_project, force=force)
+    _copy_sample_project_tree(
+        sample_source_dir, target_dir / "sample-projects" / sample_project, force=force
+    )
     _copy_env_example(repo_root / ".env.example", target_dir / ".env.example", force=force)
     _create_local_layout(target_dir)
 
@@ -106,7 +108,9 @@ def _create_local_layout(target_dir: Path) -> None:
     (target_dir / ".higgs" / "local" / "analytics").mkdir(parents=True, exist_ok=True)
 
 
-def _add_higgsagent_submodule(target_dir: Path, submodule_dir: Path, *, higgsagent_repo_url: str) -> None:
+def _add_higgsagent_submodule(
+    target_dir: Path, submodule_dir: Path, *, higgsagent_repo_url: str
+) -> None:
     if submodule_dir.exists():
         return
     _run_command(
@@ -128,7 +132,15 @@ def _update_higgsagent_submodules(submodule_dir: Path) -> None:
 
 
 def _validate_sample_project_board(sample_project_dir: Path, *, python_executable: str) -> None:
-    mt_path = sample_project_dir.parent.parent / "tools" / "higgsagent" / "tickets" / "mt" / "muontickets" / "mt.py"
+    mt_path = (
+        sample_project_dir.parent.parent
+        / "tools"
+        / "higgsagent"
+        / "tickets"
+        / "mt"
+        / "muontickets"
+        / "mt.py"
+    )
     if not mt_path.is_file():
         raise BootstrapError(f"MuonTickets CLI not found after submodule setup: {mt_path}")
     _run_command([python_executable, str(mt_path), "validate"], cwd=sample_project_dir)

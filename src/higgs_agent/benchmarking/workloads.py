@@ -8,7 +8,6 @@ from typing import Any, Mapping
 
 import yaml
 
-
 _ALLOWED_WORK_TYPES = {"code", "refactor", "tests", "docs", "chore", "spec"}
 _ALLOWED_PRIORITIES = {"p0", "p1", "p2"}
 _ALLOWED_PLATFORMS = {
@@ -147,7 +146,9 @@ def _build_workload(index: int, payload: object) -> BenchmarkWorkload:
         title=_require_string(payload, "title", context=f"workload[{index}]"),
         description=_require_string(payload, "description", context=f"workload[{index}]"),
         task=_require_string(payload, "task", context=f"workload[{index}]"),
-        ticket_shape=_build_ticket_shape(ticket_shape_payload, context=f"workload[{index}].ticket_shape"),
+        ticket_shape=_build_ticket_shape(
+            ticket_shape_payload, context=f"workload[{index}].ticket_shape"
+        ),
         success_criteria=_require_string_list(
             payload,
             "success_criteria",
@@ -175,7 +176,9 @@ def _build_ticket_shape(payload: Mapping[str, Any], *, context: str) -> Benchmar
     _require_allowed_value(work_type, _ALLOWED_WORK_TYPES, field_name="work_type", context=context)
     _require_allowed_value(priority, _ALLOWED_PRIORITIES, field_name="priority", context=context)
     _require_allowed_value(platform, _ALLOWED_PLATFORMS, field_name="platform", context=context)
-    _require_allowed_value(complexity, _ALLOWED_COMPLEXITIES, field_name="complexity", context=context)
+    _require_allowed_value(
+        complexity, _ALLOWED_COMPLEXITIES, field_name="complexity", context=context
+    )
     _require_allowed_value(
         execution_target,
         _ALLOWED_EXECUTION_TARGETS,
@@ -216,7 +219,9 @@ def _reject_unknown_or_forbidden_keys(
 
     unknown_keys = sorted(str(key) for key in keys if str(key) not in allowed_keys)
     if unknown_keys:
-        raise BenchmarkManifestError(f"{context} contains unsupported keys: {', '.join(unknown_keys)}")
+        raise BenchmarkManifestError(
+            f"{context} contains unsupported keys: {', '.join(unknown_keys)}"
+        )
 
 
 def _require_mapping(payload: Mapping[str, Any], key: str, *, context: str) -> Mapping[str, Any]:
@@ -269,6 +274,4 @@ def _require_allowed_value(
 ) -> None:
     if value not in allowed_values:
         allowed = ", ".join(sorted(allowed_values))
-        raise BenchmarkManifestError(
-            f"{context}.{field_name} must be one of: {allowed}"
-        )
+        raise BenchmarkManifestError(f"{context}.{field_name} must be one of: {allowed}")

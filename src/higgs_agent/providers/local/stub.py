@@ -7,13 +7,20 @@ from time import monotonic
 from typing import Protocol
 
 from higgs_agent.events import AttemptSummaryBuilder, EventStreamBuilder
-from higgs_agent.providers.contract import ExecutorInput, ExecutorLimits, ProviderExecutionResult, ProviderUsage
+from higgs_agent.providers.contract import (
+    ExecutorInput,
+    ExecutorLimits,
+    ProviderExecutionResult,
+    ProviderUsage,
+)
 
 
 class LocalModelTransport(Protocol):
     """Transport abstraction for local model execution."""
 
-    def generate(self, prompt: str, system_prompt: str | None, timeout_ms: int) -> dict[str, object]:
+    def generate(
+        self, prompt: str, system_prompt: str | None, timeout_ms: int
+    ) -> dict[str, object]:
         """Execute a local prompt and return a normalized raw payload."""
 
 
@@ -31,7 +38,9 @@ class LocalModelExecutor:
     limits: ExecutorLimits
     transport: LocalModelTransport
 
-    def execute(self, execution_input: ExecutorInput, *, tool_invoker=None) -> ProviderExecutionResult:
+    def execute(
+        self, execution_input: ExecutorInput, *, tool_invoker=None
+    ) -> ProviderExecutionResult:
         del tool_invoker
 
         events = EventStreamBuilder(
@@ -67,7 +76,9 @@ class LocalModelExecutor:
             events.append(
                 "execution.completed",
                 "blocked",
-                payload={"blocked_reason": execution_input.route.blocked_reason or "route_not_selected"},
+                payload={
+                    "blocked_reason": execution_input.route.blocked_reason or "route_not_selected"
+                },
                 error=error,
                 limits=self.limits,
             )
@@ -90,7 +101,9 @@ class LocalModelExecutor:
             )
 
         if execution_input.tools:
-            raise LocalModelExecutorError("local executor does not support tool definitions in Phase 3")
+            raise LocalModelExecutorError(
+                "local executor does not support tool definitions in Phase 3"
+            )
 
         started_at = monotonic()
         try:

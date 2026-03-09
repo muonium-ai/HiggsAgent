@@ -202,7 +202,9 @@ def test_cli_report_json_respects_time_window(tmp_path: Path, capsys) -> None:
     assert output[0]["metrics"]["cost_usd_total"] == 0.01
 
 
-def test_aggregate_attempt_summaries_handles_local_partial_usage_without_billing(tmp_path: Path) -> None:
+def test_aggregate_attempt_summaries_handles_local_partial_usage_without_billing(
+    tmp_path: Path,
+) -> None:
     tickets_dir = tmp_path / "tickets"
     tickets_dir.mkdir()
     _write_ticket(
@@ -263,7 +265,9 @@ def test_aggregate_attempt_summaries_handles_local_partial_usage_without_billing
     assert report.records[0]["source"]["export_safe"] is True
 
 
-def test_bounded_aggregation_excludes_rows_with_missing_or_unusable_timestamps(tmp_path: Path) -> None:
+def test_bounded_aggregation_excludes_rows_with_missing_or_unusable_timestamps(
+    tmp_path: Path,
+) -> None:
     tickets_dir = tmp_path / "tickets"
     tickets_dir.mkdir()
     _write_ticket(
@@ -358,7 +362,9 @@ def test_build_ticket_metadata_index_skips_malformed_ticket_files(tmp_path: Path
         complexity="low",
     )
     (tickets_dir / "T-000232.md").write_text("not-frontmatter\n")
-    (archive_dir / "T-000233.md").write_text("---\nid: T-000233\nstatus: done\ndepends_on: nope\n---\n")
+    (archive_dir / "T-000233.md").write_text(
+        "---\nid: T-000233\nstatus: done\ndepends_on: nope\n---\n"
+    )
 
     metadata_index = build_ticket_metadata_index(tickets_dir)
 
@@ -371,7 +377,9 @@ def test_cli_report_fails_for_missing_attempt_summaries_file(tmp_path: Path) -> 
     tickets_dir = tmp_path / "tickets"
     tickets_dir.mkdir()
 
-    with pytest.raises(SystemExit, match=r"analytics report failed: --attempt-summaries path not found"):
+    with pytest.raises(
+        SystemExit, match=r"analytics report failed: --attempt-summaries path not found"
+    ):
         main(
             [
                 "analytics",
@@ -490,7 +498,9 @@ def test_cli_report_fails_for_invalid_start_datetime(tmp_path: Path) -> None:
     attempt_summaries_path = tmp_path / "attempt-summaries.ndjson"
     attempt_summaries_path.write_text("\n")
 
-    with pytest.raises(SystemExit, match=r"analytics report failed: invalid ISO 8601 datetime for --start-at"):
+    with pytest.raises(
+        SystemExit, match=r"analytics report failed: invalid ISO 8601 datetime for --start-at"
+    ):
         main(
             [
                 "analytics",
@@ -511,7 +521,9 @@ def test_cli_report_fails_for_malformed_attempt_summary_json(tmp_path: Path) -> 
     attempt_summaries_path = tmp_path / "attempt-summaries.ndjson"
     attempt_summaries_path.write_text("{not-json}\n")
 
-    with pytest.raises(SystemExit, match=r"analytics report failed: invalid JSON in attempt summaries"):
+    with pytest.raises(
+        SystemExit, match=r"analytics report failed: invalid JSON in attempt summaries"
+    ):
         main(
             [
                 "analytics",

@@ -39,7 +39,15 @@ def test_bootstrap_sample_project_creates_layout_and_invokes_submodule_setup(
     monkeypatch.setattr(bootstrap, "_validate_sample_project_board", fake_validate)
 
     target_dir = tmp_path / "evaluation-repo"
-    main(["bootstrap", "sample-project", str(target_dir), "--higgsagent-repo-url", "https://example.invalid/HiggsAgent.git"])
+    main(
+        [
+            "bootstrap",
+            "sample-project",
+            str(target_dir),
+            "--higgsagent-repo-url",
+            "https://example.invalid/HiggsAgent.git",
+        ]
+    )
 
     assert (target_dir / ".git").exists()
     assert (target_dir / "sample-projects" / "game-of-life" / "requirements.md").exists()
@@ -57,7 +65,9 @@ def test_bootstrap_sample_project_fails_for_nonempty_target_without_force(tmp_pa
     target_dir.mkdir()
     (target_dir / "existing.txt").write_text("occupied\n")
 
-    with pytest.raises(SystemExit, match=r"bootstrap sample-project failed: target directory is not empty"):
+    with pytest.raises(
+        SystemExit, match=r"bootstrap sample-project failed: target directory is not empty"
+    ):
         main(["bootstrap", "sample-project", str(target_dir)])
 
 
@@ -67,7 +77,9 @@ def test_bootstrap_sample_project_fails_for_unknown_sample_project(
     target_dir = tmp_path / "evaluation-repo"
 
     with pytest.raises(SystemExit) as exc_info:
-        main(["bootstrap", "sample-project", str(target_dir), "--sample-project", "unknown-project"])
+        main(
+            ["bootstrap", "sample-project", str(target_dir), "--sample-project", "unknown-project"]
+        )
 
     assert exc_info.value.code == 2
     assert "invalid choice: 'unknown-project'" in capsys.readouterr().err

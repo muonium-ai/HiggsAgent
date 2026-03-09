@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from higgs_agent.runtime import parse_changed_file_spec
 import higgs_agent.cli as cli
+from higgs_agent.runtime import parse_changed_file_spec
 
 
 def test_parse_changed_file_spec_parses_text_and_binary_variants() -> None:
@@ -42,7 +42,9 @@ def test_run_ticketed_project_cli_invokes_runtime_and_prints_summary(
         return SimpleNamespace(
             ticket=SimpleNamespace(id="T-900001"),
             route=SimpleNamespace(provider="openrouter", model_id="openai/gpt-4.1"),
-            execution_result=SimpleNamespace(status="succeeded", output_text="Generated patch summary."),
+            execution_result=SimpleNamespace(
+                status="succeeded", output_text="Generated patch summary."
+            ),
             validation_decision=SimpleNamespace(decision="accepted"),
         )
 
@@ -254,11 +256,29 @@ def test_run_turnkey_project_cli_invokes_runtime_and_prints_summary(
             resumed=False,
             retry_count=0,
             commit_policy="disabled",
-            attempted_tickets=(SimpleNamespace(ticket_id="T-900010"), SimpleNamespace(ticket_id="T-900011")),
+            attempted_tickets=(
+                SimpleNamespace(ticket_id="T-900010"),
+                SimpleNamespace(ticket_id="T-900011"),
+            ),
             completed_tickets=("T-900010", "T-900011"),
-            checkpoint_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "checkpoint.json",
-            summary_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "summary.json",
-            review_bundle_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "review-bundle.json",
+            checkpoint_path=repo_root
+            / ".higgs"
+            / "local"
+            / "project-runs"
+            / "project-run-123"
+            / "checkpoint.json",
+            summary_path=repo_root
+            / ".higgs"
+            / "local"
+            / "project-runs"
+            / "project-run-123"
+            / "summary.json",
+            review_bundle_path=repo_root
+            / ".higgs"
+            / "local"
+            / "project-runs"
+            / "project-run-123"
+            / "review-bundle.json",
         )
 
     monkeypatch.setattr(cli, "run_turnkey_project", fake_run_turnkey_project)
@@ -297,7 +317,9 @@ def test_run_turnkey_project_cli_invokes_runtime_and_prints_summary(
     output = capsys.readouterr().out
     assert "project_run_id: project-run-123" in output
     assert "terminal_condition: no_ready_ticket" in output
-    assert "review_bundle_path: .higgs/local/project-runs/project-run-123/review-bundle.json" in output
+    assert (
+        "review_bundle_path: .higgs/local/project-runs/project-run-123/review-bundle.json" in output
+    )
 
 
 def test_run_turnkey_project_cli_requires_api_key(
@@ -363,9 +385,24 @@ def test_run_turnkey_project_cli_forwards_limits_and_commit_request(
             commit_policy="disabled",
             attempted_tickets=(),
             completed_tickets=(),
-            checkpoint_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "checkpoint.json",
-            summary_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "summary.json",
-            review_bundle_path=repo_root / ".higgs" / "local" / "project-runs" / "project-run-123" / "review-bundle.json",
+            checkpoint_path=repo_root
+            / ".higgs"
+            / "local"
+            / "project-runs"
+            / "project-run-123"
+            / "checkpoint.json",
+            summary_path=repo_root
+            / ".higgs"
+            / "local"
+            / "project-runs"
+            / "project-run-123"
+            / "summary.json",
+            review_bundle_path=repo_root
+            / ".higgs"
+            / "local"
+            / "project-runs"
+            / "project-run-123"
+            / "review-bundle.json",
         )
 
     monkeypatch.setattr(cli, "run_turnkey_project", fake_run_turnkey_project)

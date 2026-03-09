@@ -5,10 +5,10 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, replace
-import shutil
 from pathlib import Path
 from typing import Any, Iterable
 from uuid import uuid4
@@ -16,8 +16,16 @@ from uuid import uuid4
 from higgs_agent.application import DispatchOutcome, dispatch_next_ready_ticket
 from higgs_agent.events import EventStreamBuilder
 from higgs_agent.events.records import utc_now_iso
-from higgs_agent.providers.contract import ExecutorArtifactRef, ExecutorInput, ProviderExecutionResult
-from higgs_agent.providers.hosted import OpenRouterExecutor, OpenRouterHTTPTransport, load_executor_limits
+from higgs_agent.providers.contract import (
+    ExecutorArtifactRef,
+    ExecutorInput,
+    ProviderExecutionResult,
+)
+from higgs_agent.providers.hosted import (
+    OpenRouterExecutor,
+    OpenRouterHTTPTransport,
+    load_executor_limits,
+)
 from higgs_agent.routing import choose_route, classify_ticket, load_route_guardrails
 from higgs_agent.tickets import TicketRecord, scan_ticket_directory, select_next_ready_ticket
 from higgs_agent.validation import (
@@ -138,7 +146,9 @@ def run_turnkey_project(
     review_bundle_path = run_dir / "review-bundle.json"
 
     if resume:
-        state = _load_project_run_state(checkpoint_path=checkpoint_path, expected_project_run_id=run_id)
+        state = _load_project_run_state(
+            checkpoint_path=checkpoint_path, expected_project_run_id=run_id
+        )
         state["resumed"] = True
     else:
         if checkpoint_path.exists():
@@ -273,7 +283,9 @@ def _finalize_project_run(
     state["updated_at"] = utc_now_iso()
     _save_project_run_state(checkpoint_path, state)
     _save_project_run_summary(summary_path, state)
-    _write_project_review_bundle(review_bundle_path=review_bundle_path, tickets_dir=tickets_dir, state=state)
+    _write_project_review_bundle(
+        review_bundle_path=review_bundle_path, tickets_dir=tickets_dir, state=state
+    )
     return _build_project_run_result(
         state,
         checkpoint_path=checkpoint_path,
@@ -285,7 +297,8 @@ def _finalize_project_run(
 def _determine_no_ready_terminal_condition(tickets_dir: Path) -> str:
     scan_result = scan_ticket_directory(tickets_dir)
     if any(
-        decision.reason.startswith("blocked_by_dependency") or decision.reason.startswith("missing_dependency")
+        decision.reason.startswith("blocked_by_dependency")
+        or decision.reason.startswith("missing_dependency")
         for decision in scan_result.decisions
     ):
         return "blocked_dependency_graph"
@@ -300,13 +313,18 @@ def _terminal_condition_for_outcome(validation_decision: ValidationDecision) -> 
     return "ticket_rejected"
 
 
-def _load_project_run_state(*, checkpoint_path: Path, expected_project_run_id: str) -> dict[str, Any]:
+def _load_project_run_state(
+    *, checkpoint_path: Path, expected_project_run_id: str
+) -> dict[str, Any]:
     if not checkpoint_path.exists():
-        raise RuntimeConfigError(f"project checkpoint not found for {expected_project_run_id}: {checkpoint_path}")
+        raise RuntimeConfigError(
+            f"project checkpoint not found for {expected_project_run_id}: {checkpoint_path}"
+        )
     payload = json.loads(checkpoint_path.read_text())
     if payload.get("project_run_id") != expected_project_run_id:
         raise RuntimeConfigError(
-            f"project checkpoint id mismatch: expected {expected_project_run_id}, found {payload.get('project_run_id')}"
+            f"project checkpoint id mismatch: expected "
+            f"{expected_project_run_id}, found {payload.get('project_run_id')}"
         )
     payload.setdefault("retry_count", 0)
     payload.setdefault("consecutive_failures", 0)
@@ -363,7 +381,9 @@ def _write_project_review_bundle(
         {
             "ticket_id": record.id,
             "status": record.status,
-            "reason": scan_result.decision_for(record.id).reason if scan_result.decision_for(record.id) else "unknown",
+            "reason": scan_result.decision_for(record.id).reason
+            if scan_result.decision_for(record.id)
+            else "unknown",
         }
         for record in scan_result.tickets
         if record.id not in completed_ids and record.id not in attempted_ids
@@ -431,9 +451,7 @@ def parse_changed_file_spec(spec: str) -> ProposedFileChange:
 
     parts = spec.split(":")
     if len(parts) not in {3, 4}:
-        raise RuntimeConfigError(
-            "--changed-file must be PATH:ADDITIONS:DELETIONS[:binary]"
-        )
+        raise RuntimeConfigError("--changed-file must be PATH:ADDITIONS:DELETIONS[:binary]")
 
     path, additions_text, deletions_text, *binary_part = parts
     if not path:
@@ -601,7 +619,9 @@ def run_autonomous_ticket(
         execution_result=execution_result,
         changed_files=changed_files,
         validation_summary=validation_summary,
-        validation_passed=all(result.passed for result in validation_results) if validation_results else False,
+        validation_passed=all(result.passed for result in validation_results)
+        if validation_results
+        else False,
         write_policy_path=write_policy_path,
     )
 
@@ -618,7 +638,8 @@ def run_autonomous_ticket(
                 "comment",
                 ticket.id,
                 (
-                    f"Autonomous run completed. Validation decision: {validation_decision.decision}. "
+                    "Autonomous run completed. "
+                    f"Validation decision: {validation_decision.decision}. "
                     f"Changed paths: {', '.join(validation_decision.changed_paths) or 'none'}."
                 ),
             ],
@@ -630,12 +651,19 @@ def run_autonomous_ticket(
             status="succeeded",
             payload={"action": "comment", "ticket_id": ticket.id},
         )
-        _run_muontickets_command(mt_cli_path, ["set-status", ticket.id, "needs_review"], cwd=repo_root)
+        _run_muontickets_command(
+            mt_cli_path, ["set-status", ticket.id, "needs_review"], cwd=repo_root
+        )
         execution_result = _append_event(
             execution_result,
             event_type="ticket.workflow.updated",
             status="succeeded",
-            payload={"action": "set-status", "from": "claimed", "to": "needs_review", "ticket_id": ticket.id},
+            payload={
+                "action": "set-status",
+                "from": "claimed",
+                "to": "needs_review",
+                "ticket_id": ticket.id,
+            },
         )
     else:
         _run_muontickets_command(
@@ -654,7 +682,11 @@ def run_autonomous_ticket(
             execution_result,
             event_type="ticket.workflow.updated",
             status="succeeded",
-            payload={"action": "comment", "ticket_id": ticket.id, "reason": validation_decision.reason},
+            payload={
+                "action": "comment",
+                "ticket_id": ticket.id,
+                "reason": validation_decision.reason,
+            },
         )
 
     outcome = DispatchOutcome(
@@ -735,7 +767,9 @@ def persist_dispatch_outcome(*, repo_root: Path, outcome: DispatchOutcome) -> Di
 
     updated_attempt_summary = dict(outcome.execution_result.attempt_summary)
     if artifact_refs:
-        updated_attempt_summary["artifact_refs"] = [artifact.as_schema_payload() for artifact in artifact_refs]
+        updated_attempt_summary["artifact_refs"] = [
+            artifact.as_schema_payload() for artifact in artifact_refs
+        ]
     _append_ndjson_line(attempt_summaries_path, updated_attempt_summary)
 
     updated_execution_result = replace(
@@ -799,7 +833,11 @@ def _build_autonomous_prompt(
     workspace_sections = []
     for item in workspace_snapshot:
         workspace_sections.append(f"Path: {item['path']}\n```\n{item['content']}\n```")
-    workspace_text = "\n\n".join(workspace_sections) if workspace_sections else "No existing workspace files captured."
+    workspace_text = (
+        "\n\n".join(workspace_sections)
+        if workspace_sections
+        else "No existing workspace files captured."
+    )
     title = ticket.frontmatter.get("title", ticket.id)
     body = ticket.body.strip() or "No additional ticket body."
     repo_root_name = repo_root.name
@@ -808,10 +846,7 @@ def _build_autonomous_prompt(
             f"Ticket: {ticket.id} - {title}",
             f"Ticket details:\n{body}",
             f"Project requirements:\n{requirements_text.strip()}",
-            (
-                "Current workspace snapshot:\n"
-                f"{workspace_text}"
-            ),
+            (f"Current workspace snapshot:\n{workspace_text}"),
             (
                 "Return only valid JSON with this shape: "
                 '{"summary": "short summary", "directories": ["relative/path"], '
@@ -822,12 +857,15 @@ def _build_autonomous_prompt(
             (
                 f"The repository root is already the {repo_root_name} project directory. "
                 "All output paths must be relative to this root. "
-                "Use paths like `src/...`, `tests/...`, `fixtures/...`, `README.md`, and `pyproject.toml`. "
-                f"Do not prefix paths with `sample-projects/{repo_root_name}/`, `{repo_root_name}/`, or any outer workspace directory."
+                "Use paths like `src/...`, `tests/...`, `fixtures/...`, "
+                "`README.md`, and `pyproject.toml`. "
+                f"Do not prefix paths with `sample-projects/{repo_root_name}/`, "
+                f"`{repo_root_name}/`, or any outer workspace directory."
             ),
             (
-                "Use repository-relative paths only. Patch entries must target existing files and replace a single "
-                "exact matched snippet. Do not include markdown fences outside JSON."
+                "Use repository-relative paths only. Patch entries must "
+                "target existing files and replace a single exact matched "
+                "snippet. Do not include markdown fences outside JSON."
             ),
         ]
     )
@@ -843,7 +881,15 @@ def _collect_workspace_snapshot(
     snapshot: list[dict[str, str]] = []
     ignored_roots = {repo_root / ".git", repo_root / ".higgs", tickets_dir.resolve()}
     ignored_names = {".venv", ".pytest_cache", "__pycache__"}
-    prioritized_roots = ("src/", "tests/", "fixtures/", "README.md", "pyproject.toml", "requirements.md", "instructions.md")
+    prioritized_roots = (
+        "src/",
+        "tests/",
+        "fixtures/",
+        "README.md",
+        "pyproject.toml",
+        "requirements.md",
+        "instructions.md",
+    )
 
     def _snapshot_sort_key(path: Path) -> tuple[int, str]:
         relative = str(path.relative_to(repo_root)).replace("\\", "/")
@@ -857,7 +903,11 @@ def _collect_workspace_snapshot(
             break
         if not path.is_file():
             continue
-        if any(parent == ignored_root for ignored_root in ignored_roots for parent in [path, *path.parents]):
+        if any(
+            parent == ignored_root
+            for ignored_root in ignored_roots
+            for parent in [path, *path.parents]
+        ):
             continue
         if any(name in ignored_names for name in path.parts):
             continue
@@ -888,7 +938,9 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
     raw_directories = payload.get("directories", [])
     if raw_directories is None:
         raw_directories = []
-    if not isinstance(raw_directories, list) or not all(isinstance(item, str) for item in raw_directories):
+    if not isinstance(raw_directories, list) or not all(
+        isinstance(item, str) for item in raw_directories
+    ):
         raise RuntimeConfigError("autonomous response 'directories' must be a list of strings")
     raw_writes = payload.get("writes", payload.get("files", []))
     if raw_writes is None:
@@ -908,7 +960,9 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
         path = raw_write.get("path")
         content = raw_write.get("content", raw_write.get("text"))
         if not isinstance(path, str) or not isinstance(content, str):
-            raise RuntimeConfigError("autonomous response writes require string 'path' and 'content'")
+            raise RuntimeConfigError(
+                "autonomous response writes require string 'path' and 'content'"
+            )
         writes.append(AutonomousFileWrite(path=path, content=content))
 
     patches = _coalesce_autonomous_patches(
@@ -925,7 +979,8 @@ def _parse_autonomous_plan(output_text: str) -> AutonomousPlan:
 
     if not directories and not writes and not patches:
         raise RuntimeConfigError(
-            "autonomous response did not describe any scaffold directories, file writes, or patch operations"
+            "autonomous response did not describe any scaffold "
+            "directories, file writes, or patch operations"
         )
 
     return AutonomousPlan(
@@ -947,22 +1002,30 @@ def _parse_autonomous_patch_entries(
         before = raw_patch.get("before", raw_patch.get("find", raw_patch.get("old_text")))
         after = raw_patch.get("after", raw_patch.get("replace", raw_patch.get("new_text")))
         if not isinstance(path, str) or not path:
-            raise RuntimeConfigError(f"autonomous {context_label} patch entries require a non-empty string 'path'")
+            raise RuntimeConfigError(
+                f"autonomous {context_label} patch entries require a non-empty string 'path'"
+            )
         if not isinstance(before, str) or not before:
             raise RuntimeConfigError(
                 f"autonomous {context_label} patch entries require a non-empty string 'before'"
             )
         if not isinstance(after, str):
-            raise RuntimeConfigError(f"autonomous {context_label} patch entries require string 'after'")
+            raise RuntimeConfigError(
+                f"autonomous {context_label} patch entries require string 'after'"
+            )
         patches.append(AutonomousFilePatch(path=path, before=before, after=after))
     return patches
 
 
-def _parse_scaffold_payload(payload: dict[str, object]) -> tuple[list[str], list[AutonomousFileWrite]]:
+def _parse_scaffold_payload(
+    payload: dict[str, object],
+) -> tuple[list[str], list[AutonomousFileWrite]]:
     raw_directories = payload.get("directories", [])
     if raw_directories is None:
         raw_directories = []
-    if not isinstance(raw_directories, list) or not all(isinstance(item, str) for item in raw_directories):
+    if not isinstance(raw_directories, list) or not all(
+        isinstance(item, str) for item in raw_directories
+    ):
         raise RuntimeConfigError("autonomous scaffold 'directories' must be a list of strings")
 
     raw_files = payload.get("files", payload.get("writes", []))
@@ -978,7 +1041,9 @@ def _parse_scaffold_payload(payload: dict[str, object]) -> tuple[list[str], list
         path = raw_file.get("path")
         content = raw_file.get("content", raw_file.get("text"))
         if not isinstance(path, str) or not isinstance(content, str):
-            raise RuntimeConfigError("autonomous scaffold file entries require string 'path' and 'content'")
+            raise RuntimeConfigError(
+                "autonomous scaffold file entries require string 'path' and 'content'"
+            )
         writes.append(AutonomousFileWrite(path=path, content=content))
 
     raw_tree = payload.get("tree", payload.get("entries", []))
@@ -995,15 +1060,21 @@ def _parse_scaffold_payload(payload: dict[str, object]) -> tuple[list[str], list
     return directories, writes
 
 
-def _parse_scaffold_tree_entry(entry: object, *, parent_prefix: Path) -> tuple[list[str], list[AutonomousFileWrite]]:
+def _parse_scaffold_tree_entry(
+    entry: object, *, parent_prefix: Path
+) -> tuple[list[str], list[AutonomousFileWrite]]:
     if not isinstance(entry, dict):
         raise RuntimeConfigError("autonomous scaffold tree entries must be objects")
     entry_type = entry.get("type")
     path_text = entry.get("path")
     if not isinstance(entry_type, str) or entry_type not in {"directory", "file"}:
-        raise RuntimeConfigError("autonomous scaffold tree entries require type 'directory' or 'file'")
+        raise RuntimeConfigError(
+            "autonomous scaffold tree entries require type 'directory' or 'file'"
+        )
     if not isinstance(path_text, str) or not path_text:
-        raise RuntimeConfigError("autonomous scaffold tree entries require a non-empty string 'path'")
+        raise RuntimeConfigError(
+            "autonomous scaffold tree entries require a non-empty string 'path'"
+        )
 
     relative_path = _normalize_relative_path(str(parent_prefix / path_text))
     children = entry.get("children", [])
@@ -1018,7 +1089,9 @@ def _parse_scaffold_tree_entry(entry: object, *, parent_prefix: Path) -> tuple[l
         directories = [str(relative_path).replace("\\", "/")]
         writes: list[AutonomousFileWrite] = []
         for child in children:
-            child_directories, child_writes = _parse_scaffold_tree_entry(child, parent_prefix=relative_path)
+            child_directories, child_writes = _parse_scaffold_tree_entry(
+                child, parent_prefix=relative_path
+            )
             directories.extend(child_directories)
             writes.extend(child_writes)
         return directories, writes
@@ -1036,17 +1109,21 @@ def _reject_duplicate_materialization_paths(
     writes: list[AutonomousFileWrite],
     patches: list[AutonomousFilePatch],
 ) -> None:
-    duplicate_directories = _duplicate_items([str(_normalize_relative_path(directory)).replace("\\", "/") for directory in directories])
+    duplicate_directories = _duplicate_items(
+        [str(_normalize_relative_path(directory)).replace("\\", "/") for directory in directories]
+    )
     if duplicate_directories:
         raise RuntimeConfigError(
-            f"autonomous scaffold declared duplicate directories: {', '.join(sorted(duplicate_directories))}"
+            "autonomous scaffold declared duplicate directories: "
+            f"{', '.join(sorted(duplicate_directories))}"
         )
 
     write_paths = [str(_normalize_relative_path(write.path)).replace("\\", "/") for write in writes]
     duplicate_writes = _duplicate_items(write_paths)
     if duplicate_writes:
         raise RuntimeConfigError(
-            f"autonomous scaffold declared duplicate file writes: {', '.join(sorted(duplicate_writes))}"
+            "autonomous scaffold declared duplicate file writes: "
+            f"{', '.join(sorted(duplicate_writes))}"
         )
 
 
@@ -1091,7 +1168,7 @@ def _extract_json_payload(output_text: str) -> object:
         fence_header_end = text.find("\n", fenced_start)
         fenced_end = text.rfind("```")
         if fence_header_end != -1 and fenced_end > fence_header_end:
-            candidate = text[fence_header_end + 1:fenced_end].strip()
+            candidate = text[fence_header_end + 1 : fenced_end].strip()
             try:
                 return json.loads(candidate)
             except json.JSONDecodeError:
@@ -1101,9 +1178,11 @@ def _extract_json_payload(output_text: str) -> object:
     end = text.rfind("}")
     if start != -1 and end > start:
         try:
-            return json.loads(text[start:end + 1])
+            return json.loads(text[start : end + 1])
         except json.JSONDecodeError as exc:
-            raise RuntimeConfigError(f"autonomous response did not contain valid JSON: {exc}") from exc
+            raise RuntimeConfigError(
+                f"autonomous response did not contain valid JSON: {exc}"
+            ) from exc
     raise RuntimeConfigError("autonomous response did not contain a JSON object")
 
 
@@ -1210,7 +1289,9 @@ def _apply_autonomous_plan(
         )
 
     if plan.patches and not changed_files:
-        raise RuntimeConfigError("autonomous patches could not be materialized into workspace changes")
+        raise RuntimeConfigError(
+            "autonomous patches could not be materialized into workspace changes"
+        )
 
     return tuple(changed_files.values()), updated_result
 
@@ -1259,7 +1340,9 @@ def _try_exact_autonomous_patch(
     match_count = before_content.count(patch.before)
     if match_count == 1:
         return before_content.replace(patch.before, patch.after, 1), "exact_replace"
-    if _strip_single_trailing_newline(before_content) == _strip_single_trailing_newline(patch.before):
+    if _strip_single_trailing_newline(before_content) == _strip_single_trailing_newline(
+        patch.before
+    ):
         return patch.after, "exact_replace_normalized_eof"
     return None
 
@@ -1433,7 +1516,13 @@ def _evaluate_autonomous_write_request(
             decision="rejected",
             reason=execution_result.metadata.get("failure_reason")
             or execution_result.attempt_summary.get("error", {}).get("kind", "executor_failed"),
-            diagnostics=(str(execution_result.attempt_summary.get("error", {}).get("message", "executor failed")),),
+            diagnostics=(
+                str(
+                    execution_result.attempt_summary.get("error", {}).get(
+                        "message", "executor failed"
+                    )
+                ),
+            ),
             changed_paths=tuple(change.path for change in changed_files),
             requires_human_review=False,
         )

@@ -11,7 +11,6 @@ from higgs_agent.benchmarking import (
 )
 from higgs_agent.providers.contract import ProviderExecutionResult, ProviderUsage
 from higgs_agent.routing import RouteDecision
-
 from tests.Unit.test_benchmark_harness import FakeExecutor, _result_for
 
 
@@ -23,12 +22,16 @@ def test_benchmark_report_exposes_raw_metrics_and_explicit_quality_signals() -> 
             BenchmarkCandidate(
                 "balanced",
                 _route(workload, "openrouter", "openai/gpt-4o", "balanced"),
-                FakeExecutor(lambda execution_input: _result_for(execution_input, output_text="balanced")),
+                FakeExecutor(
+                    lambda execution_input: _result_for(execution_input, output_text="balanced")
+                ),
             ),
             BenchmarkCandidate(
                 "deep",
                 _route(workload, "openrouter", "anthropic/claude-3.5-sonnet", "deep"),
-                FakeExecutor(lambda execution_input: _result_for(execution_input, output_text="deep")),
+                FakeExecutor(
+                    lambda execution_input: _result_for(execution_input, output_text="deep")
+                ),
             ),
         ),
         config=BenchmarkHarnessConfig(benchmark_id="bench-report-1"),
@@ -37,9 +40,7 @@ def test_benchmark_report_exposes_raw_metrics_and_explicit_quality_signals() -> 
     report = build_benchmark_report(
         harness_result,
         quality_signals_by_candidate={
-            "balanced": (
-                BenchmarkQualitySignal("rubric_accuracy", 0.8, "Preserved constraints"),
-            ),
+            "balanced": (BenchmarkQualitySignal("rubric_accuracy", 0.8, "Preserved constraints"),),
             "deep": (
                 BenchmarkQualitySignal("rubric_accuracy", 0.9, "More complete tradeoff analysis"),
             ),
@@ -63,12 +64,16 @@ def test_benchmark_report_surfaces_missing_metrics_and_ties() -> None:
             BenchmarkCandidate(
                 "docs-a",
                 _route(workload, "openrouter", "openai/gpt-4o-mini", "economy"),
-                FakeExecutor(lambda execution_input: _result_for_without_precise_cost(execution_input)),
+                FakeExecutor(
+                    lambda execution_input: _result_for_without_precise_cost(execution_input)
+                ),
             ),
             BenchmarkCandidate(
                 "docs-b",
                 _route(workload, "local", "local/llama3.1:8b", "local"),
-                FakeExecutor(lambda execution_input: _result_for_without_precise_cost(execution_input)),
+                FakeExecutor(
+                    lambda execution_input: _result_for_without_precise_cost(execution_input)
+                ),
             ),
         ),
         config=BenchmarkHarnessConfig(benchmark_id="bench-report-2"),

@@ -18,8 +18,12 @@ def test_adaptive_scoring_prefers_high_success_lower_cost_route() -> None:
     semantics = _semantics(execution_target="auto", work_type="docs", tool_profile="none")
     snapshot = build_adaptive_snapshot_from_attempt_summaries(
         (
-            _summary("openrouter", "openai/gpt-4o-mini", "succeeded", cost_usd=0.03, duration_ms=900),
-            _summary("openrouter", "openai/gpt-4o-mini", "succeeded", cost_usd=0.02, duration_ms=800),
+            _summary(
+                "openrouter", "openai/gpt-4o-mini", "succeeded", cost_usd=0.03, duration_ms=900
+            ),
+            _summary(
+                "openrouter", "openai/gpt-4o-mini", "succeeded", cost_usd=0.02, duration_ms=800
+            ),
             _summary("openrouter", "openai/gpt-4o", "failed", cost_usd=0.2, duration_ms=2000),
             _summary("openrouter", "openai/gpt-4o", "succeeded", cost_usd=0.18, duration_ms=1800),
         ),
@@ -36,7 +40,10 @@ def test_adaptive_scoring_prefers_high_success_lower_cost_route() -> None:
     )
 
     assert selection.selected_route.model_id == "openai/gpt-4o-mini"
-    assert selection.scoring_weights["success_rate_weight"] == AdaptiveScoringWeights().success_rate_weight
+    assert (
+        selection.scoring_weights["success_rate_weight"]
+        == AdaptiveScoringWeights().success_rate_weight
+    )
     assert selection.tie_break_policy == (
         "total_score_desc",
         "estimated_cost_usd_asc",
@@ -45,7 +52,9 @@ def test_adaptive_scoring_prefers_high_success_lower_cost_route() -> None:
     )
     assert selection.ranked_candidates[0].total_score > selection.ranked_candidates[1].total_score
     assert "success_signal" in selection.ranked_candidates[0].factor_scores
-    assert any(item.startswith("success_rate:") for item in selection.ranked_candidates[0].explanation)
+    assert any(
+        item.startswith("success_rate:") for item in selection.ranked_candidates[0].explanation
+    )
 
 
 def test_adaptive_scoring_preserves_execution_target_constraints() -> None:
@@ -77,7 +86,9 @@ def test_adaptive_scoring_preserves_execution_target_constraints() -> None:
 
 def test_adaptive_scoring_uses_tie_break_rules_deterministically() -> None:
     semantics = _semantics(execution_target="auto", work_type="docs", tool_profile="none")
-    snapshot = build_adaptive_snapshot_from_attempt_summaries((), generated_at=datetime(2026, 3, 7, 12, 0, tzinfo=UTC))
+    snapshot = build_adaptive_snapshot_from_attempt_summaries(
+        (), generated_at=datetime(2026, 3, 7, 12, 0, tzinfo=UTC)
+    )
 
     selection = select_adaptive_route(
         semantics,
@@ -103,9 +114,7 @@ def test_adaptive_scoring_uses_tie_break_rules_deterministically() -> None:
 def test_adaptive_scoring_falls_back_to_deterministic_defaults_for_stale_telemetry() -> None:
     semantics = _semantics(execution_target="auto", work_type="docs", tool_profile="none")
     snapshot = build_adaptive_snapshot_from_attempt_summaries(
-        (
-            _summary("openrouter", "openai/gpt-4o", "succeeded", cost_usd=0.01, duration_ms=100),
-        ),
+        (_summary("openrouter", "openai/gpt-4o", "succeeded", cost_usd=0.01, duration_ms=100),),
         generated_at=datetime(2026, 3, 7, 12, 0, tzinfo=UTC),
         freshness_reference=datetime(2026, 3, 7, 12, 0, tzinfo=UTC),
     )
@@ -116,7 +125,9 @@ def test_adaptive_scoring_falls_back_to_deterministic_defaults_for_stale_telemet
             replace(
                 snapshot.entries[0],
                 freshness_state="stale",
-                telemetry_gaps=tuple(sorted((*snapshot.entries[0].telemetry_gaps, "stale_telemetry"))),
+                telemetry_gaps=tuple(
+                    sorted((*snapshot.entries[0].telemetry_gaps, "stale_telemetry"))
+                ),
             ),
         ),
     )
@@ -140,7 +151,9 @@ def test_adaptive_scoring_falls_back_to_deterministic_defaults_for_stale_telemet
 
 def test_adaptive_scoring_rejects_missing_eligible_candidates() -> None:
     semantics = _semantics(execution_target="local")
-    snapshot = build_adaptive_snapshot_from_attempt_summaries((), generated_at=datetime(2026, 3, 7, 12, 0, tzinfo=UTC))
+    snapshot = build_adaptive_snapshot_from_attempt_summaries(
+        (), generated_at=datetime(2026, 3, 7, 12, 0, tzinfo=UTC)
+    )
 
     with pytest.raises(AdaptiveScoringError, match="no eligible candidates"):
         select_adaptive_route(

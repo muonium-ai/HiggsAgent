@@ -278,7 +278,10 @@ def test_run_autonomous_ticket_materializes_nested_scaffold_tree_and_records_pla
                                                     {
                                                         "type": "file",
                                                         "path": "test_scaffold.py",
-                                                        "content": "def test_placeholder():\n    assert True\n",
+                                                        "content": (
+                                                            "def test_placeholder():\n"
+                                                            "    assert True\n"
+                                                        ),
                                                     }
                                                 ],
                                             },
@@ -303,7 +306,9 @@ def test_run_autonomous_ticket_materializes_nested_scaffold_tree_and_records_pla
         "src/game_of_life/__init__.py",
         "tests/test_scaffold.py",
     ]
-    artifacts_dir = repo_root / outcome.execution_result.metadata["telemetry_paths"]["artifacts_dir"]
+    artifacts_dir = (
+        repo_root / outcome.execution_result.metadata["telemetry_paths"]["artifacts_dir"]
+    )
     assert (artifacts_dir / "materialization-plan.json").is_file()
     assert any(call[:3] == ["set-status", "T-000102", "needs_review"] for call in mt_calls)
 
@@ -502,8 +507,7 @@ def test_run_autonomous_ticket_rejects_ambiguous_structured_patch(
     mt_cli_path.write_text("print('ok')\n")
     (repo_root / "src").mkdir()
     (repo_root / "src" / "app.py").write_text(
-        "def answer_one():\n    return 41\n\n"
-        "def answer_two():\n    return 41\n"
+        "def answer_one():\n    return 41\n\ndef answer_two():\n    return 41\n"
     )
     (tickets_dir / "T-000105.md").write_text(
         "---\n"
@@ -600,7 +604,9 @@ def test_apply_autonomous_patch_rejects_large_fuzzy_rewrite_without_exact_match(
     patch = runtime.AutonomousFilePatch(
         path="src/example.py",
         before=before_content + "\n",
-        after=before_content.replace("from dataclasses import dataclass", "import random\nfrom dataclasses import dataclass"),
+        after=before_content.replace(
+            "from dataclasses import dataclass", "import random\nfrom dataclasses import dataclass"
+        ),
     )
 
     result = runtime._apply_autonomous_patch(Path("src/example.py"), before_content, patch)
@@ -685,7 +691,9 @@ def test_run_turnkey_project_resume_appends_to_existing_checkpoint(
     mt_cli_path.write_text("print('ok')\n")
 
     project_run_id = "project-run-resume"
-    checkpoint_path = repo_root / ".higgs" / "local" / "project-runs" / project_run_id / "checkpoint.json"
+    checkpoint_path = (
+        repo_root / ".higgs" / "local" / "project-runs" / project_run_id / "checkpoint.json"
+    )
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     checkpoint_path.write_text(
         json.dumps(
@@ -703,7 +711,9 @@ def test_run_turnkey_project_resume_appends_to_existing_checkpoint(
                         "execution_status": "succeeded",
                         "validation_decision": "accepted",
                         "validation_reason": None,
-                        "telemetry_paths": {"events": ".higgs/local/runs/run-1/attempt-1/events.ndjson"},
+                        "telemetry_paths": {
+                            "events": ".higgs/local/runs/run-1/attempt-1/events.ndjson"
+                        },
                     }
                 ],
                 "completed_tickets": ["T-000201"],
@@ -747,7 +757,9 @@ def test_run_turnkey_project_resume_appends_to_existing_checkpoint(
     assert checkpoint["completed_tickets"] == ["T-000201", "T-000202"]
 
 
-def test_run_turnkey_project_stops_on_max_ticket_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_turnkey_project_stops_on_max_ticket_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     requirements_path = repo_root / "requirements.md"
@@ -894,7 +906,9 @@ def test_run_turnkey_project_rejects_unsupported_local_commit_request(
     guardrails_path.write_text(Path("config/guardrails.example.json").read_text())
     write_policy_path.write_text(Path("config/write-policy.example.json").read_text())
 
-    with pytest.raises(runtime.RuntimeConfigError, match="local commit creation is not yet supported"):
+    with pytest.raises(
+        runtime.RuntimeConfigError, match="local commit creation is not yet supported"
+    ):
         runtime.run_turnkey_project(
             repo_root=repo_root,
             requirements_path=requirements_path,

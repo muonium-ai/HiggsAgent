@@ -30,7 +30,9 @@ class FakeExecutor:
         self._result_factory = result_factory
         self.calls: list[ExecutorInput] = []
 
-    def execute(self, execution_input: ExecutorInput, *, tool_invoker=None) -> ProviderExecutionResult:
+    def execute(
+        self, execution_input: ExecutorInput, *, tool_invoker=None
+    ) -> ProviderExecutionResult:
         self.calls.append(execution_input)
         return self._result_factory(execution_input)
 
@@ -43,8 +45,14 @@ def test_benchmark_harness_executes_same_workload_with_shared_control_plane() ->
     result = run_benchmark_workload(
         workload,
         (
-            BenchmarkCandidate("balanced", _route(workload, "openrouter", "openai/gpt-4o", "balanced"), executor_a),
-            BenchmarkCandidate("deep", _route(workload, "openrouter", "anthropic/claude-3.5-sonnet", "deep"), executor_b),
+            BenchmarkCandidate(
+                "balanced", _route(workload, "openrouter", "openai/gpt-4o", "balanced"), executor_a
+            ),
+            BenchmarkCandidate(
+                "deep",
+                _route(workload, "openrouter", "anthropic/claude-3.5-sonnet", "deep"),
+                executor_b,
+            ),
         ),
         config=BenchmarkHarnessConfig(
             benchmark_id="bench-spec-1",
@@ -57,11 +65,19 @@ def test_benchmark_harness_executes_same_workload_with_shared_control_plane() ->
     assert result.shared_execution_context["candidate_ids"] == ["balanced", "deep"]
     assert len(result.candidate_results) == 2
     assert executor_a.calls[0].prompt == executor_b.calls[0].prompt
-    assert executor_a.calls[0].system_prompt == executor_b.calls[0].system_prompt == "Benchmark evaluator"
+    assert (
+        executor_a.calls[0].system_prompt
+        == executor_b.calls[0].system_prompt
+        == "Benchmark evaluator"
+    )
     assert executor_a.calls[0].repo_head == executor_b.calls[0].repo_head == "abc123"
     assert executor_a.calls[0].allow_tool_calls is True
     assert executor_b.calls[0].allow_tool_calls is True
-    assert executor_a.calls[0].ticket_id == executor_b.calls[0].ticket_id == "BENCH-spec-routing-tradeoff-analysis"
+    assert (
+        executor_a.calls[0].ticket_id
+        == executor_b.calls[0].ticket_id
+        == "BENCH-spec-routing-tradeoff-analysis"
+    )
     assert result.candidate_results[0].execution_result.output_text == "A"
     assert result.candidate_results[1].execution_result.output_text == "B"
     _validate_event_stream(result.candidate_results[0].execution_result.events)
@@ -69,12 +85,20 @@ def test_benchmark_harness_executes_same_workload_with_shared_control_plane() ->
 
 
 def test_benchmark_harness_rejects_repository_write_workloads() -> None:
-    workload = replace(load_benchmark_workload_manifest().workloads[0], requires_repository_write=True)
+    workload = replace(
+        load_benchmark_workload_manifest().workloads[0], requires_repository_write=True
+    )
 
     with pytest.raises(BenchmarkHarnessError, match="repository writes are unsupported"):
         run_benchmark_workload(
             workload,
-            (BenchmarkCandidate("docs", _route(workload, "openrouter", "openai/gpt-4o-mini", "economy"), FakeExecutor(_result_for)),),
+            (
+                BenchmarkCandidate(
+                    "docs",
+                    _route(workload, "openrouter", "openai/gpt-4o-mini", "economy"),
+                    FakeExecutor(_result_for),
+                ),
+            ),
             config=BenchmarkHarnessConfig(benchmark_id="bench-write-1"),
         )
 
@@ -82,13 +106,18 @@ def test_benchmark_harness_rejects_repository_write_workloads() -> None:
 def test_benchmark_harness_rejects_incomparable_candidate_tool_requirements() -> None:
     workload = load_benchmark_workload_manifest().workloads[0]
 
-    with pytest.raises(BenchmarkHarnessError, match="tool-call requirement must match the workload tool profile"):
+    with pytest.raises(
+        BenchmarkHarnessError, match="tool-call requirement must match the workload tool profile"
+    ):
         run_benchmark_workload(
             workload,
             (
                 BenchmarkCandidate(
                     "bad-tools",
-                    replace(_route(workload, "openrouter", "openai/gpt-4o-mini", "economy"), requires_tool_calls=True),
+                    replace(
+                        _route(workload, "openrouter", "openai/gpt-4o-mini", "economy"),
+                        requires_tool_calls=True,
+                    ),
                     FakeExecutor(_result_for),
                 ),
             ),
@@ -141,7 +170,9 @@ def _route(workload, provider: str, model_id: str, route_family: str) -> RouteDe
 
 
 def _result_for(execution_input: ExecutorInput, output_text: str = "ok") -> ProviderExecutionResult:
-    usage = ProviderUsage(tokens_prompt=10, tokens_completion=5, total_tokens=15, cost_usd=0.01, latency_ms=250)
+    usage = ProviderUsage(
+        tokens_prompt=10, tokens_completion=5, total_tokens=15, cost_usd=0.01, latency_ms=250
+    )
     event_builder = EventStreamBuilder(
         run_id=execution_input.run_id,
         attempt_id=execution_input.attempt_id,
@@ -189,12 +220,16 @@ def _result_for(execution_input: ExecutorInput, output_text: str = "ok") -> Prov
 def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     validator = jsonschema.Draft202012Validator(event_schema, registry=registry)
     for event in events:
@@ -204,11 +239,15 @@ def _validate_event_stream(events: tuple[dict[str, object], ...]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     jsonschema.Draft202012Validator(summary_schema, registry=registry).validate(summary)

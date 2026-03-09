@@ -39,9 +39,7 @@ def test_write_gate_accepts_allowed_deterministic_changes() -> None:
 def test_write_gate_requires_review_for_protected_paths() -> None:
     decision = evaluate_write_request(
         _validation_input(
-            changed_files=(
-                ProposedFileChange(path="pyproject.toml", additions=1, deletions=1),
-            )
+            changed_files=(ProposedFileChange(path="pyproject.toml", additions=1, deletions=1),)
         ),
         load_write_policy(Path("config/write-policy.example.json")),
     )

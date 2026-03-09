@@ -134,7 +134,9 @@ def _build_workload_prompt(workload: BenchmarkWorkload) -> str:
 
 def _validate_workload(workload: BenchmarkWorkload) -> None:
     if workload.requires_repository_write:
-        raise BenchmarkHarnessError("benchmark workloads requiring repository writes are unsupported")
+        raise BenchmarkHarnessError(
+            "benchmark workloads requiring repository writes are unsupported"
+        )
 
 
 def _validate_config(workload: BenchmarkWorkload, config: BenchmarkHarnessConfig) -> None:

@@ -124,9 +124,7 @@ def select_adaptive_route(
     if not candidate_list:
         raise AdaptiveScoringError("adaptive route scoring requires at least one candidate")
 
-    telemetry_index = {
-        (entry.provider, entry.model): entry for entry in telemetry_snapshot.entries
-    }
+    telemetry_index = {(entry.provider, entry.model): entry for entry in telemetry_snapshot.entries}
     max_known_cost = max(
         (candidate.estimated_cost_usd or 0.0 for candidate in candidate_list),
         default=0.0,
@@ -154,7 +152,9 @@ def select_adaptive_route(
             )
             continue
 
-        telemetry_entry = telemetry_index.get((candidate.provider or "unknown", candidate.model_id or "unknown"))
+        telemetry_entry = telemetry_index.get(
+            (candidate.provider or "unknown", candidate.model_id or "unknown")
+        )
         scored_candidates.append(
             _score_candidate(
                 semantics=semantics,
@@ -209,7 +209,9 @@ def _score_candidate(
     max_known_cost: float,
     max_known_latency: float | None,
 ) -> AdaptiveRouteScore:
-    telemetry_gaps = telemetry_entry.telemetry_gaps if telemetry_entry is not None else ("telemetry_missing",)
+    telemetry_gaps = (
+        telemetry_entry.telemetry_gaps if telemetry_entry is not None else ("telemetry_missing",)
+    )
     used_deterministic_defaults = _should_use_deterministic_defaults(telemetry_entry)
     if used_deterministic_defaults:
         success_signal = 0.5
@@ -242,8 +244,15 @@ def _score_candidate(
         telemetry_gaps=telemetry_gaps,
         used_deterministic_defaults=used_deterministic_defaults,
     )
-    estimated_cost = candidate.estimated_cost_usd if candidate.estimated_cost_usd is not None else 999999.0
-    tie_break_key = (-total_score, estimated_cost, candidate.provider or "", candidate.model_id or "")
+    estimated_cost = (
+        candidate.estimated_cost_usd if candidate.estimated_cost_usd is not None else 999999.0
+    )
+    tie_break_key = (
+        -total_score,
+        estimated_cost,
+        candidate.provider or "",
+        candidate.model_id or "",
+    )
     return AdaptiveRouteScore(
         route=candidate,
         total_score=total_score,
@@ -281,7 +290,11 @@ def _cost_signal(
     telemetry_entry: AdaptiveTelemetryEntry | None,
     max_known_cost: float,
 ) -> float:
-    reference_cost = telemetry_entry.avg_cost_usd if telemetry_entry and telemetry_entry.avg_cost_usd is not None else candidate.estimated_cost_usd
+    reference_cost = (
+        telemetry_entry.avg_cost_usd
+        if telemetry_entry and telemetry_entry.avg_cost_usd is not None
+        else candidate.estimated_cost_usd
+    )
     if reference_cost is None:
         return 0.5
     if max_known_cost <= 0:

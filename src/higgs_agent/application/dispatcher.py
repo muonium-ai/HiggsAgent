@@ -43,8 +43,6 @@ def dispatch_next_ready_ticket(
 ) -> DispatchOutcome | None:
     """Run the deterministic hybrid dispatcher pipeline for the next ready ticket."""
 
-    from higgs_agent.providers.hosted import OpenRouterExecutor, load_executor_limits
-    from higgs_agent.providers.local import LocalModelExecutor
     from higgs_agent.routing import choose_route, classify_ticket, load_route_guardrails
     from higgs_agent.validation import ValidationInput, evaluate_write_request, load_write_policy
 
@@ -199,7 +197,9 @@ def _execute_hosted_fallback(
     )
     fallback_result = fallback_executor.execute(fallback_input, tool_invoker=tool_invoker)
     fallback_attempt_summary = dict(fallback_result.attempt_summary)
-    fallback_attempt_summary["retry_count"] = primary_result.retry_count + fallback_result.retry_count + 1
+    fallback_attempt_summary["retry_count"] = (
+        primary_result.retry_count + fallback_result.retry_count + 1
+    )
 
     combined_events = _resequenced_events(
         primary_result.events

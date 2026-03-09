@@ -141,5 +141,7 @@ class ProviderExecutionResult:
 class ProviderExecutor(Protocol):
     """Shared executor boundary used by hosted and local provider adapters."""
 
-    def execute(self, execution_input: ExecutorInput, *, tool_invoker=None) -> ProviderExecutionResult:
+    def execute(
+        self, execution_input: ExecutorInput, *, tool_invoker=None
+    ) -> ProviderExecutionResult:
         """Execute a route and return a normalized provider result."""

@@ -80,8 +80,7 @@ def test_adaptive_selection_payload_remains_observable_and_analytics_compatible(
     assert payload["ranked_candidates"][0]["selected"] is True
     assert payload["ranked_candidates"][0]["used_deterministic_defaults"] is False
     assert any(
-        item.startswith("success_rate:")
-        for item in payload["ranked_candidates"][0]["explanation"]
+        item.startswith("success_rate:") for item in payload["ranked_candidates"][0]["explanation"]
     )
     json.dumps(payload)
 
@@ -171,12 +170,16 @@ def _candidate(
 def _validate_event(event: dict[str, object]) -> None:
     event_schema = json.loads(Path("schemas/execution-event.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     jsonschema.Draft202012Validator(event_schema, registry=registry).validate(event)
 
@@ -184,12 +187,16 @@ def _validate_event(event: dict[str, object]) -> None:
 def _validate_attempt_summary(summary: dict[str, object]) -> None:
     summary_schema = json.loads(Path("schemas/execution-attempt.schema.json").read_text())
     common_defs = json.loads(Path("schemas/common-defs.schema.json").read_text())
-    registry = Registry().with_resource(
-        common_defs["$id"],
-        Resource.from_contents(common_defs),
-    ).with_resource(
-        "common-defs.schema.json",
-        Resource.from_contents(common_defs),
+    registry = (
+        Registry()
+        .with_resource(
+            common_defs["$id"],
+            Resource.from_contents(common_defs),
+        )
+        .with_resource(
+            "common-defs.schema.json",
+            Resource.from_contents(common_defs),
+        )
     )
     jsonschema.Draft202012Validator(summary_schema, registry=registry).validate(summary)
 

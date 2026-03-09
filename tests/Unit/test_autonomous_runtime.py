@@ -611,7 +611,69 @@ def test_apply_autonomous_patch_rejects_large_fuzzy_rewrite_without_exact_match(
 
     result = runtime._apply_autonomous_patch(Path("src/example.py"), before_content, patch)
 
-    assert result is None
+    assert isinstance(result, runtime.PatchSkipReason)
+    assert result.kind == "target_drift"
+
+
+def test_apply_autonomous_patch_reports_ambiguous_match_reason() -> None:
+    before_content = "def answer_one():\n    return 41\n\ndef answer_two():\n    return 41\n"
+    patch = runtime.AutonomousFilePatch(
+        path="src/app.py",
+        before="return 41",
+        after="return 42",
+    )
+
+    result = runtime._apply_autonomous_patch(Path("src/app.py"), before_content, patch)
+
+    assert isinstance(result, runtime.PatchSkipReason)
+    assert result.kind == "ambiguous_match"
+    assert "matched 2 locations" in result.detail
+
+
+def test_apply_autonomous_patch_reports_target_drift_reason() -> None:
+    before_content = "def answer():\n    return 42\n"
+    patch = runtime.AutonomousFilePatch(
+        path="src/app.py",
+        before="return 99",
+        after="return 100",
+    )
+
+    result = runtime._apply_autonomous_patch(Path("src/app.py"), before_content, patch)
+
+    assert isinstance(result, runtime.PatchSkipReason)
+    assert result.kind == "target_drift"
+    assert "not found" in result.detail
+
+
+def test_apply_autonomous_patch_reports_low_confidence_reason() -> None:
+    before_content = (
+        "def alpha():\n    return 1\n\ndef beta():\n    return 2\n\ndef gamma():\n    return 3\n"
+    )
+    patch = runtime.AutonomousFilePatch(
+        path="src/app.py",
+        before="def totally_different():\n    return 999\n",
+        after="def replaced():\n    return 0\n",
+    )
+
+    result = runtime._apply_autonomous_patch(Path("src/app.py"), before_content, patch)
+
+    assert isinstance(result, runtime.PatchSkipReason)
+    assert result.kind in ("target_drift", "low_confidence")
+
+
+def test_apply_autonomous_patch_reports_fuzzy_disallowed_for_json() -> None:
+    before_content = '{"key": "old_val", "other": "stuff"}\n'
+    patch = runtime.AutonomousFilePatch(
+        path="config/settings.json",
+        before='"key": "old_value"',
+        after='"key": "new_value"',
+    )
+
+    result = runtime._apply_autonomous_patch(Path("config/settings.json"), before_content, patch)
+
+    assert isinstance(result, runtime.PatchSkipReason)
+    assert result.kind == "fuzzy_disallowed"
+    assert ".json" in result.detail
 
 
 def test_run_turnkey_project_reuses_single_ticket_runtime_and_persists_checkpoint(

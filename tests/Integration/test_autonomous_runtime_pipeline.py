@@ -333,6 +333,7 @@ def test_autonomous_runtime_rejects_fixture_patch_without_corrupting_workspace(
     assert outcome.validation_decision.decision == "rejected"
     assert outcome.validation_decision.reason == "materialization_failure"
     assert "could not be materialized" in outcome.validation_decision.diagnostics[0]
+    assert "matched 2 locations" in outcome.validation_decision.diagnostics[0]
     assert (repo_root / "src" / "game_of_life" / "engine.py").read_text() == original_content
     assert not any(call[:3] == ["set-status", "T-920002", "needs_review"] for call in mt_calls)
 

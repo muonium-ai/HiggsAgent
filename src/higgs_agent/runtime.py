@@ -59,6 +59,17 @@ class AutonomousFilePatch:
 
 
 @dataclass(frozen=True, slots=True)
+class PatchSkipReason:
+    """Describes why a specific patch could not be applied."""
+
+    kind: str  # ambiguous_match | target_drift | low_confidence | fuzzy_disallowed
+    detail: str
+
+    def __str__(self) -> str:
+        return self.detail
+
+
+@dataclass(frozen=True, slots=True)
 class AutonomousPlan:
     """Structured filesystem mutation plan returned by the coding model."""
 
@@ -1240,10 +1251,12 @@ def _apply_autonomous_plan(
             payload={"path": str(relative_path).replace("\\", "/")},
         )
 
+    patch_skip_reasons: list[str] = []
     for patch in plan.patches:
         relative_path = _normalize_repo_relative_path(repo_root, patch.path)
         absolute_path = repo_root / relative_path
         if not absolute_path.exists():
+            patch_skip_reasons.append(f"{relative_path}: target file missing")
             updated_result = _append_event(
                 updated_result,
                 event_type="file.patch_skipped",
@@ -1251,19 +1264,22 @@ def _apply_autonomous_plan(
                 payload={
                     "path": str(relative_path).replace("\\", "/"),
                     "reason": "target_missing",
+                    "detail": "target file missing",
                 },
             )
             continue
         before_content = absolute_path.read_text()
         patch_result = _apply_autonomous_patch(relative_path, before_content, patch)
-        if patch_result is None:
+        if isinstance(patch_result, PatchSkipReason):
+            patch_skip_reasons.append(f"{relative_path}: {patch_result.detail}")
             updated_result = _append_event(
                 updated_result,
                 event_type="file.patch_skipped",
                 status="failed",
                 payload={
                     "path": str(relative_path).replace("\\", "/"),
-                    "reason": "target_drift_or_ambiguous",
+                    "reason": patch_result.kind,
+                    "detail": patch_result.detail,
                 },
             )
             continue
@@ -1289,8 +1305,9 @@ def _apply_autonomous_plan(
         )
 
     if plan.patches and not changed_files:
+        reasons = "; ".join(patch_skip_reasons) if patch_skip_reasons else "unknown"
         raise RuntimeConfigError(
-            "autonomous patches could not be materialized into workspace changes"
+            f"autonomous patches could not be materialized into workspace changes: {reasons}"
         )
 
     return tuple(changed_files.values()), updated_result
@@ -1324,19 +1341,27 @@ def _apply_autonomous_patch(
     path: Path,
     before_content: str,
     patch: AutonomousFilePatch,
-) -> tuple[str, str] | None:
-    exact_patch = _try_exact_autonomous_patch(before_content, patch)
-    if exact_patch is not None:
-        return exact_patch
-    if _disallow_fuzzy_patch(path) or not _allow_fuzzy_patch(before_content, patch):
-        return None
+) -> tuple[str, str] | PatchSkipReason:
+    exact_result = _try_exact_autonomous_patch(before_content, patch)
+    if not isinstance(exact_result, PatchSkipReason):
+        return exact_result
+    if _disallow_fuzzy_patch(path):
+        return PatchSkipReason(
+            kind="fuzzy_disallowed",
+            detail=(
+                f"fuzzy patching disallowed for {path.suffix} files; "
+                f"exact match failed: {exact_result.detail}"
+            ),
+        )
+    if not _allow_fuzzy_patch(before_content, patch):
+        return exact_result
     return _try_fuzzy_patch(before_content, patch)
 
 
 def _try_exact_autonomous_patch(
     before_content: str,
     patch: AutonomousFilePatch,
-) -> tuple[str, str] | None:
+) -> tuple[str, str] | PatchSkipReason:
     match_count = before_content.count(patch.before)
     if match_count == 1:
         return before_content.replace(patch.before, patch.after, 1), "exact_replace"
@@ -1344,7 +1369,15 @@ def _try_exact_autonomous_patch(
         patch.before
     ):
         return patch.after, "exact_replace_normalized_eof"
-    return None
+    if match_count > 1:
+        return PatchSkipReason(
+            kind="ambiguous_match",
+            detail=f"before text matched {match_count} locations",
+        )
+    return PatchSkipReason(
+        kind="target_drift",
+        detail="before text not found in current file content",
+    )
 
 
 def _allow_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> bool:
@@ -1353,11 +1386,16 @@ def _allow_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> bool:
     return _count_unique_anchor_lines(before_content, patch.before) >= 2
 
 
-def _try_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> tuple[str, str] | None:
+def _try_fuzzy_patch(
+    before_content: str, patch: AutonomousFilePatch
+) -> tuple[str, str] | PatchSkipReason:
     before_lines = patch.before.splitlines()
     current_lines = before_content.splitlines()
     if not before_lines or not current_lines:
-        return None
+        return PatchSkipReason(
+            kind="low_confidence",
+            detail="empty before or current content",
+        )
 
     if len(before_lines) > len(current_lines):
         candidate_windows = [(0, len(current_lines))]
@@ -1376,11 +1414,23 @@ def _try_fuzzy_patch(before_content: str, patch: AutonomousFilePatch) -> tuple[s
 
     ranked_windows.sort(reverse=True)
     if not ranked_windows:
-        return None
+        return PatchSkipReason(
+            kind="low_confidence",
+            detail="no candidate windows found",
+        )
     best_ratio, start, end = ranked_windows[0]
     second_ratio = ranked_windows[1][0] if len(ranked_windows) > 1 else 0.0
-    if best_ratio < 0.72 or best_ratio - second_ratio < 0.08:
-        return None
+    if best_ratio < 0.72:
+        return PatchSkipReason(
+            kind="low_confidence",
+            detail=f"best fuzzy match confidence {best_ratio:.2f} below threshold 0.72",
+        )
+    if best_ratio - second_ratio < 0.08:
+        return PatchSkipReason(
+            kind="low_confidence",
+            detail=f"fuzzy match confidence gap {best_ratio:.2f} "
+            f"vs {second_ratio:.2f} below margin 0.08",
+        )
 
     replacement_lines = patch.after.splitlines()
     updated_lines = current_lines[:start] + replacement_lines + current_lines[end:]
